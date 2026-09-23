@@ -1,0 +1,1387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Digital Twin Value Planner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --paper:#EDF0EE; --panel:#F9FBFA; --ink:#16222E; --muted:#56636E; --rule:#C8D0CC; --soft:#E2E7E4;
+  --benefit:#0E7A6A; --cost:#8A3B6E; --net:#1F4E8C; --mark:#C99700;
+  --band1:rgba(31,78,140,.04); --band2:rgba(31,78,140,.09); --band3:rgba(14,122,106,.13);
+  --good:#0E7A6A; --bad:#A3334B; --warn:#9A6B00; --hl:rgba(201,151,0,.12);
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#11181E; --panel:#18222A; --ink:#E3E9E6; --muted:#9AA7AF; --rule:#2F3C45; --soft:#212D36;
+    --benefit:#3CC2A8; --cost:#D57CB3; --net:#80AAE8; --mark:#F2C230;
+    --band1:rgba(128,170,232,.04); --band2:rgba(128,170,232,.09); --band3:rgba(60,194,168,.14);
+    --good:#3CC2A8; --bad:#EE7A92; --warn:#F2C230; --hl:rgba(242,194,48,.12);
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#11181E; --panel:#18222A; --ink:#E3E9E6; --muted:#9AA7AF; --rule:#2F3C45; --soft:#212D36;
+  --benefit:#3CC2A8; --cost:#D57CB3; --net:#80AAE8; --mark:#F2C230;
+  --band1:rgba(128,170,232,.04); --band2:rgba(128,170,232,.09); --band3:rgba(60,194,168,.14);
+  --good:#3CC2A8; --bad:#EE7A92; --warn:#F2C230; --hl:rgba(242,194,48,.12);
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+html,body{margin:0;background:var(--paper);color:var(--ink)}
+body{font-family:"Public Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:15px;line-height:1.5;font-variant-numeric:tabular-nums}
+.app{display:grid;grid-template-columns:250px minmax(0,1fr);min-height:100vh}
+nav.side{border-right:1px solid var(--rule);padding:28px 20px;position:sticky;top:env(safe-area-inset-top,0px);height:100vh;overflow:auto}
+.brand h1{font-size:22px;line-height:1.15;font-weight:800;letter-spacing:-.01em;margin:0 0 8px}
+.brand p{margin:0 0 24px;color:var(--muted);font-size:13px}
+.steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+.steps button{all:unset;cursor:pointer;display:grid;grid-template-columns:26px 1fr;align-items:center;gap:8px;width:100%;padding:9px 10px;border-radius:6px;font-weight:500;color:var(--muted)}
+.steps button:hover{background:var(--soft);color:var(--ink)}
+.steps button[aria-selected="true"]{background:var(--ink);color:var(--paper)}
+.steps .n{display:inline-grid;place-items:center;width:22px;height:22px;line-height:1;flex:none;border:1.5px solid currentColor;border-radius:50%;font-size:12px;font-weight:700}
+.steps .n.q{border-style:dashed}
+.steps .sep{height:1px;background:var(--rule);margin:10px 4px}
+.side .live{margin-top:24px;padding:14px;border:1px solid var(--rule);border-radius:8px;background:var(--panel)}
+.side .live .v{font-size:20px;font-weight:800;line-height:1.15;margin:2px 0}
+.side .live .l{font-size:12px;color:var(--muted)}
+.side .foot{margin-top:20px;font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+.linkbtn{all:unset;cursor:pointer;text-decoration:underline;text-underline-offset:3px;font-size:12.5px;color:var(--muted)}
+.linkbtn:hover{color:var(--ink)}
+button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:2px solid var(--mark);outline-offset:2px}
+main{padding:32px clamp(16px,4vw,48px) 64px;max-width:1200px;width:100%}
+section.view{display:none}
+section.view.on{display:block}
+.stepno{font-size:13px;font-weight:600;color:var(--muted);margin:0 0 6px}
+h2{font-size:30px;line-height:1.15;letter-spacing:-.015em;font-weight:800;margin:0 0 8px;max-width:26ch}
+.lede{color:var(--muted);max-width:70ch;margin:0 0 22px;font-size:15.5px}
+h3{font-size:17px;font-weight:700;margin:0 0 6px}
+.sub{font-size:13.5px;color:var(--muted);margin:0 0 12px;max-width:75ch}
+.grid{display:grid;gap:20px}
+.g-screen{grid-template-columns:minmax(0,1fr) minmax(0,1.15fr)}
+.g-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.g-set{grid-template-columns:minmax(0,1.3fr) minmax(0,1fr)}
+.panel{background:var(--panel);border:1px solid var(--rule);border-radius:10px;padding:20px}
+label.f{display:block;font-size:13px;font-weight:600;margin:0 0 4px}
+.hint{font-size:12.5px;color:var(--muted);margin:3px 0 0}
+.row{margin-bottom:16px}
+input[type=number],select,input[type=text]{font:inherit;font-size:14px;color:var(--ink);background:var(--paper);border:1px solid var(--rule);border-radius:6px;padding:6px 8px;width:100%}
+input[type=number]{text-align:right}
+.fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{all:unset;cursor:pointer;font-size:12.5px;padding:5px 10px;border:1px solid var(--rule);border-radius:999px;background:var(--paper)}
+.chip:hover{border-color:var(--ink)}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.btn{all:unset;cursor:pointer;font-weight:600;font-size:14px;padding:9px 16px;border-radius:6px;background:var(--ink);color:var(--paper);display:inline-block;text-align:center}
+.btn:hover{opacity:.88}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--ink)}
+.btn.sm{font-size:13px;padding:6px 12px}
+.tpls{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px}
+.tpl{all:unset;cursor:pointer;border:1px solid var(--rule);border-radius:8px;padding:12px;background:var(--paper)}
+.tpl:hover{border-color:var(--ink)}
+.tpl[aria-pressed="true"]{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink);background:var(--panel)}
+.tpl b{display:block;font-size:14px;margin-bottom:2px}
+.tpl span{font-size:12px;color:var(--muted);line-height:1.35;display:block}
+.toast{display:none;margin-top:12px;font-size:13px;padding:8px 12px;border-radius:6px;background:var(--hl);align-items:center;gap:12px;justify-content:space-between}
+.toast.on{display:flex}
+.how{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--rule);border:1px solid var(--rule);border-radius:10px;overflow:hidden;margin-bottom:22px}
+.how div{background:var(--panel);padding:14px 16px;font-size:13.5px}
+.how b{display:block;font-size:14px;margin-bottom:2px}
+.how i{font-style:normal;display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;background:var(--ink);color:var(--paper);font-size:11px;font-weight:700;margin-bottom:6px}
+.chartbox{position:relative;height:360px}
+.chartbox.sm{height:260px}
+.chartbox.xs{height:200px}
+.verdict{border-left:4px solid var(--mark);padding:6px 0 6px 14px;margin:18px 0 0}
+.verdict .big{font-size:21px;font-weight:800;line-height:1.2;margin-bottom:4px}
+.verdict p{margin:0;color:var(--muted);max-width:70ch}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:1px;background:var(--rule);border:1px solid var(--rule);border-radius:10px;overflow:hidden;margin-bottom:20px}
+.kpi{background:var(--panel);padding:14px 16px}
+.kpi .v{font-size:23px;font-weight:800;letter-spacing:-.01em;line-height:1.15}
+.kpi .l{font-size:13px;font-weight:600;margin-top:4px}
+.kpi .e{font-size:12px;color:var(--muted);margin-top:2px;line-height:1.4}
+.pos{color:var(--good)} .neg{color:var(--bad)} .mid{color:var(--warn)}
+.banner{display:flex;gap:16px;align-items:flex-start;padding:18px 20px;border-radius:10px;border:1px solid var(--rule);background:var(--panel);margin:0 0 20px}
+.banner .dot{flex:0 0 14px;height:14px;border-radius:50%;margin-top:7px}
+.banner .big{font-size:22px;font-weight:800;line-height:1.2;margin-bottom:4px}
+.banner p{margin:0;max-width:78ch}
+.tablewrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th,td{padding:6px 6px;border-bottom:1px solid var(--rule);text-align:right;white-space:nowrap;vertical-align:middle}
+th.l,td.l{text-align:left}
+thead th{font-size:12px;color:var(--muted);font-weight:600;vertical-align:bottom;white-space:normal}
+td input[type=number]{width:82px;padding:4px 6px;font-size:13.5px}
+td input[type=text]{min-width:240px;padding:4px 6px;font-size:13.5px}
+td input.amt[type=text]{min-width:0;width:118px;text-align:right}
+td select{width:auto;padding:4px 6px;font-size:13px}
+td.val{font-weight:600}
+.del{all:unset;cursor:pointer;color:var(--muted);font-size:18px;line-height:1;padding:2px 6px;border-radius:4px}
+.del:hover{color:var(--bad);background:var(--soft)}
+.split{display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:space-between;margin-bottom:8px}
+.mt{margin-top:20px}
+.note{font-size:13px;color:var(--muted);max-width:78ch}
+.unit{display:inline-block;font-size:12px;font-weight:600;padding:3px 8px;border-radius:4px;background:var(--soft);color:var(--muted)}
+details.explain{margin:0 0 14px;font-size:13.5px;max-width:80ch}
+details.explain summary{cursor:pointer;color:var(--net);font-weight:600;list-style:none}
+details.explain summary::-webkit-details-marker{display:none}
+details.explain summary::before{content:"+ ";font-weight:700}
+details.explain[open] summary::before{content:"− "}
+details.explain div{padding:8px 0 2px;color:var(--muted)}
+.q{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 14px;align-items:center;padding:10px 0;border-bottom:1px solid var(--rule)}
+.q:last-child{border-bottom:none}
+.q .t{font-size:14px;font-weight:500}
+.q .t small{display:block;color:var(--muted);font-size:12px;font-weight:400}
+.seg{display:inline-flex;border:1px solid var(--rule);border-radius:6px;overflow:hidden}
+.seg button{all:unset;cursor:pointer;width:30px;text-align:center;padding:5px 0;font-size:13px;font-weight:600;color:var(--muted);border-left:1px solid var(--rule)}
+.seg button:first-child{border-left:none}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+.scale{display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted);margin:4px 0 6px}
+.scores{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:14px}
+.score{padding:12px 14px;border:1px solid var(--rule);border-radius:8px}
+.score .v{font-size:26px;font-weight:800}
+.score .l{font-size:12.5px;color:var(--muted)}
+.meter{height:6px;border-radius:3px;background:var(--soft);margin-top:6px;overflow:hidden}
+.meter i{display:block;height:100%;background:var(--net)}
+tr.best td{background:var(--hl)}
+.badge{font-size:11.5px;font-weight:700;padding:2px 7px;border-radius:4px;background:var(--mark);color:#1b1b1b;margin-left:6px}
+.facts{margin:0;padding-left:18px;font-size:13.5px}
+.facts li{margin-bottom:6px}
+.prose{max-width:72ch}
+.prose p{margin:0 0 12px}
+.prose h3{margin-top:26px}
+.prose dl{margin:0}
+.prose dt{font-weight:700;margin-top:12px}
+.prose dd{margin:2px 0 0;color:var(--muted)}
+.nav-next{display:flex;justify-content:space-between;margin-top:24px;gap:12px}
+.calc{padding:0}
+.calc>summary{cursor:pointer;list-style:none;padding:16px 20px;font-weight:700;font-size:17px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+.calc>summary::-webkit-details-marker{display:none}
+.calc>summary::after{content:"Hide";font-size:13px;color:var(--net);font-weight:600}
+.calc:not([open])>summary::after{content:"Show"}
+.calcbody{padding:4px 20px 20px;border-top:1px solid var(--rule)}
+.calcbody h4{margin:18px 0 4px;font-size:14.5px}
+.calcbody p{margin:0 0 8px;max-width:80ch;font-size:14px}
+.calcbody table{margin:6px 0 10px;max-width:760px}
+.fx{font-family:"Cambria Math","STIX Two Math",Georgia,serif;font-size:15.5px;background:var(--soft);border-radius:6px;padding:8px 12px;margin:6px 0 8px;overflow-x:auto;white-space:nowrap}
+.ex{font-size:13.5px;border-left:3px solid var(--benefit);padding:4px 0 4px 12px;margin:6px 0 10px;max-width:80ch}
+.ex .t{font-size:12px;color:var(--muted);font-weight:600;display:block}
+.inline-field{display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;margin:0 0 16px}
+.inline-field > div{min-width:180px}
+.check{display:flex;gap:8px;align-items:center;font-weight:600;font-size:13.5px;margin:4px 0 10px;cursor:pointer}
+.check input{width:16px;height:16px;accent-color:var(--net)}
+.credit{display:flex;gap:14px;align-items:flex-start;padding:16px 18px;border:1px solid var(--rule);border-left:4px solid var(--net);border-radius:10px;background:var(--panel);margin:0 0 22px}
+.credit b{display:block;font-size:14px;margin-bottom:2px}
+.credit p{margin:0;font-size:13.5px;color:var(--muted);max-width:95ch}
+.credit a,.sitefoot a,.side .foot a,.prose a{color:var(--net);text-underline-offset:3px}
+.sitefoot{margin-top:40px;padding-top:16px;border-top:1px solid var(--rule);font-size:12.5px;color:var(--muted);max-width:95ch}
+.sitefoot p{margin:0 0 6px}
+@media (max-width:980px){
+  .app{grid-template-columns:minmax(0,1fr)}
+  main{min-width:0}
+  nav.side{position:sticky;height:auto;border-right:none;border-bottom:1px solid var(--rule);padding:12px 12px 10px;background:var(--paper);z-index:5}
+  .brand p,.side .foot,.side .live{display:none}
+  .brand h1{font-size:17px;margin-bottom:8px}
+  .steps{flex-direction:row;overflow-x:auto;gap:4px}
+  .steps li{flex:0 0 auto}
+  .steps button{width:auto;white-space:nowrap;padding:7px 10px}
+  .steps .sep{display:none}
+  .g-screen,.g-2,.g-set{grid-template-columns:1fr}
+  .how{grid-template-columns:1fr 1fr}
+  h2{font-size:25px}
+  .chartbox{height:300px}
+  .q{grid-template-columns:1fr}
+}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+<nav class="side" aria-label="Steps">
+  <div class="brand">
+    <h1>Digital twin value planner</h1>
+    <p>Find out whether a digital twin is worth it for your system, and how detailed it should be.</p>
+  </div>
+  <ul class="steps" role="tablist">
+    <li><button role="tab" data-view="setup" aria-selected="true"><span class="n">1</span>Your system</button></li>
+    <li><button role="tab" data-view="fit" aria-selected="false"><span class="n">2</span>Right-size it</button></li>
+    <li><button role="tab" data-view="ben" aria-selected="false"><span class="n">3</span>Benefits</button></li>
+    <li><button role="tab" data-view="cost" aria-selected="false"><span class="n">4</span>Costs</button></li>
+    <li><button role="tab" data-view="opts" aria-selected="false"><span class="n">5</span>Compare options</button></li>
+    <li><button role="tab" data-view="res" aria-selected="false"><span class="n">6</span>Verdict</button></li>
+    <li class="sep" aria-hidden="true"></li>
+    <li><button role="tab" data-view="guide" aria-selected="false"><span class="n q">?</span>Guide and glossary</button></li>
+  </ul>
+  <div class="live" id="liveBox"></div>
+  <div class="foot">
+    <span>Method based on the NIST report <a href="https://doi.org/10.6028/NIST.AMS.100-61" target="_blank" rel="noopener"><i>Economics of Digital Twins</i></a> (AMS 100-61, 2024).</span>
+    <span>Your inputs are saved in this browser.</span>
+    <button class="linkbtn" id="themeBtn">Switch light/dark</button>
+    <button class="linkbtn" id="resetAll">Start over</button>
+  </div>
+</nav>
+
+<main>
+<!-- ============ 1. SYSTEM ============ -->
+<section class="view on" id="v-setup" role="tabpanel">
+  <p class="stepno">Step 1 of 6</p>
+  <h2>Is a digital twin worth it?</h2>
+  <p class="lede">A digital twin is a virtual copy of a real machine, building, process or network that predicts how it will behave, so you can run it better and fix problems before they happen. This planner weighs what one would save against what it would cost, and checks whether a simpler, cheaper approach would do the job.</p>
+  <div class="how">
+    <div><i>1</i><b>Describe the system</b>Pick an example close to yours.</div>
+    <div><i>2</i><b>Right-size it</b>Answer 11 quick questions about complexity and risk.</div>
+    <div><i>3</i><b>Enter savings and costs</b>Replace the example numbers with your own.</div>
+    <div><i>4</i><b>Get a verdict</b>See which option pays best and how sure you can be.</div>
+  </div>
+  <div class="credit" role="note">
+    <div><b>Acknowledgment</b><p>This planner's approach, including matching the level of modeling to system complexity and the cost of mistakes, valuing a twin by the losses it avoids, and using net present value, internal rate of return and Monte Carlo analysis, is based on the National Institute of Standards and Technology (NIST) report <i>Economics of Digital Twins: Costs, Benefits, and Economic Decision Making</i> by Douglas Thomas (NIST Advanced Manufacturing Series 100-61, 2024). Read it free at <a href="https://doi.org/10.6028/NIST.AMS.100-61" target="_blank" rel="noopener">doi.org/10.6028/NIST.AMS.100-61</a>. Credit for the underlying economic framework goes to its author. NIST did not develop, review or endorse this tool.</p></div>
+  </div>
+  <div class="grid g-set">
+    <div class="panel">
+      <h3>Pick the example closest to your system</h3>
+      <p class="sub">This fills in typical savings and costs as a starting point. Every number can be changed later.</p>
+      <div class="tpls" id="tpls"></div>
+      <div class="toast" id="tplToast"><span id="tplToastMsg"></span><button class="btn ghost sm" id="undoTpl">Undo</button></div>
+    </div>
+    <div class="panel">
+      <h3>Basic settings</h3>
+      <p class="sub">The defaults suit most cases.</p>
+      <div class="row"><label class="f" for="pname">What are you twinning? (optional)</label><input type="text" id="pname" placeholder="e.g. Packaging line 3, Main hospital, Wind farm A"></div>
+      <div class="fields">
+        <div><label class="f" for="cur">Currency</label><select id="cur"><option>$</option><option>€</option><option>£</option><option>¥</option><option>₹</option><option>A$</option><option>C$</option><option>CHF </option><option>R$</option></select></div>
+        <div><label class="f" for="T">Years to evaluate</label><input type="number" id="T" min="1" max="30"><p class="hint">Typically the useful life of the system, 5–15 years.</p></div>
+        <div><label class="f" for="r">Discount rate (%)</label><input type="number" id="r" min="0" max="50" step="0.5"><p class="hint">The return you'd expect elsewhere. Future savings count for less than money today.</p></div>
+        <div><label class="f" for="build">Months to build before go-live</label><input type="number" id="build" min="0" max="60" step="1"><p class="hint">No savings until the twin is running.</p></div>
+        <div><label class="f" for="rampY">Years to reach full savings</label><input type="number" id="rampY" min="0" max="10" step="0.5"><p class="hint">Savings build up after go-live while people learn the tool. 0 = full savings at once.</p></div>
+        <div><label class="f" for="gB">Yearly growth in savings (%)</label><input type="number" id="gB" min="-20" max="30" step="0.5"><p class="hint">0 if savings stay flat.</p></div>
+        <div><label class="f" for="gC">Yearly rise in running costs (%)</label><input type="number" id="gC" min="-20" max="30" step="0.5"><p class="hint">For example, inflation.</p></div>
+      </div>
+      <label class="check mt"><input type="checkbox" id="taxOn"> Include company tax</label>
+      <div class="fields" id="taxFields">
+        <div><label class="f" for="tax">Tax rate (%)</label><input type="number" id="tax" min="0" max="60" step="0.5"></div>
+        <div><label class="f" for="dep">Write off one-time costs over (years)</label><input type="number" id="dep" min="1" max="30" step="1"><p class="hint">Depreciation reduces tax in those years.</p></div>
+      </div>
+    </div>
+  </div>
+  <div class="panel mt">
+    <h3 id="tipsTitle">Tips for this kind of system</h3>
+    <ul class="facts" id="facts"></ul>
+  </div>
+  <details class="calc panel mt" open><summary>How this step is calculated</summary><div class="calcbody" id="calc-setup"></div></details>
+  <div class="nav-next"><span></span><button class="btn" data-go="fit">Next: right-size it</button></div>
+</section>
+
+<!-- ============ 2. FIT ============ -->
+<section class="view" id="v-fit" role="tabpanel">
+  <p class="stepno">Step 2 of 6</p>
+  <h2>How detailed does the model need to be?</h2>
+  <p class="lede">More detailed models cost more to build and run. They only pay off when a system is complicated and getting it wrong is expensive. For simpler systems, a few sensors and a dashboard often capture most of the value. Rate each statement from 1 (not at all) to 5 (very much).</p>
+  <div class="grid g-screen">
+    <div class="panel">
+      <h3>How complicated is the system?</h3>
+      <div class="scale"><span>1 = not at all</span><span>5 = very much</span></div>
+      <div id="qC"></div>
+      <h3 class="mt">How costly are mistakes?</h3>
+      <div class="scale"><span>1 = not at all</span><span>5 = very much</span></div>
+      <div id="qK"></div>
+      <h3 class="mt">How ready is your organization?</h3>
+      <div class="scale"><span>1 = not at all</span><span>5 = very much</span></div>
+      <div id="qR"></div>
+    </div>
+    <div>
+      <div class="panel">
+        <div class="scores">
+          <div class="score"><div class="l">Complexity</div><div class="v" id="cxV"></div><div class="meter"><i id="cxM"></i></div></div>
+          <div class="score"><div class="l">Cost of mistakes</div><div class="v" id="ccV"></div><div class="meter"><i id="ccM"></i></div></div>
+        </div>
+        <div class="row" style="margin-bottom:10px">
+          <label class="f">How does value grow as the model gets more accurate?</label>
+          <div class="chips" id="effChips">
+            <button class="chip" data-eff="continuous">Gradually</button>
+            <button class="chip" data-eff="threshold">Once a target is met</button>
+            <button class="chip" data-eff="binary">All or nothing</button>
+          </div>
+          <p class="hint" id="effHint"></p>
+        </div>
+        <div class="chartbox"><canvas id="fitChart" aria-label="Value, cost and net gain by level of model detail"></canvas></div>
+        <details class="explain" style="margin-top:12px"><summary>How to read this chart</summary><div>Left to right, the model gets more detailed. The green line is the value it creates, the purple line is what it costs, and the blue line is the difference. The dashed line marks the level of detail where the difference is largest. The chart shows direction only; the money comes from steps 3–5.</div></details>
+        <div class="verdict" id="verdict"></div>
+        <p class="note" id="readyNote" style="margin-top:14px"></p>
+      </div>
+    </div>
+  </div>
+  <details class="calc panel mt" open><summary>How this step is calculated</summary><div class="calcbody" id="calc-fit"></div></details>
+  <div class="nav-next"><button class="btn ghost" data-go="setup">Back</button><button class="btn" data-go="ben">Next: benefits</button></div>
+</section>
+
+<!-- ============ 3. BENEFITS ============ -->
+<section class="view" id="v-ben" role="tabpanel">
+  <p class="stepno">Step 3 of 6</p>
+  <h2>What would a digital twin save or earn each year?</h2>
+  <p class="lede">List the costs and losses that better predictions would reduce. Assume the most detailed option, a full digital twin; step 5 works out how much of this the cheaper options would deliver. Where you are unsure, give a range: a low, an expected and a high guess.</p>
+  <p><span class="unit" id="unitNote"></span></p>
+  <div class="inline-field">
+    <div><label class="f" for="overlap">Overlap between items (%)</label><input type="number" id="overlap" min="0" max="80" step="1" style="max-width:160px"></div>
+    <p class="hint" style="max-width:60ch;margin:0 0 6px">If some items describe the same saving twice (fewer breakdowns and less repair labor, say), reduce the total by this much. 0 if they are separate.</p>
+  </div>
+  <div class="kpis" id="benKpis"></div>
+
+  <div class="panel">
+    <div class="split"><h3 style="margin:0">Lower running costs</h3><button class="btn ghost sm" data-add="eff">Add a cost</button></div>
+    <p class="sub">Ongoing costs the twin would shrink, such as labor, energy, materials, maintenance or inventory. Value = cost today × % cut.</p>
+    <div class="tablewrap"><table id="tEff"><thead><tr>
+      <th class="l">What gets cheaper</th><th class="l">Area</th><th>Yearly cost today</th><th>% cut: low</th><th>Expected</th><th>High</th><th>Yearly value</th><th></th>
+    </tr></thead><tbody></tbody></table></div>
+  </div>
+
+  <div class="panel mt">
+    <div class="split"><h3 style="margin:0">Problems avoided</h3><button class="btn ghost sm" data-add="risk">Add a problem</button></div>
+    <p class="sub">Breakdowns, outages, incidents, fines or missed deadlines the twin would help prevent. Value = times per year × cost each time × % prevented. For rare events use a fraction, e.g. 0.2 for once every five years.</p>
+    <div class="tablewrap"><table id="tRisk"><thead><tr>
+      <th class="l">What goes wrong</th><th class="l">Area</th><th>Times per year</th><th>Cost each time</th><th>% prevented: low</th><th>Expected</th><th>High</th><th>Yearly value</th><th></th>
+    </tr></thead><tbody></tbody></table></div>
+  </div>
+
+  <div class="panel mt">
+    <div class="split"><h3 style="margin:0">Extra income</h3><button class="btn ghost sm" data-add="rev">Add income</button></div>
+    <p class="sub">More sales from better quality, faster delivery or more capacity. Only the profit margin counts, not the full sale. Value = extra revenue × margin.</p>
+    <div class="tablewrap"><table id="tRev"><thead><tr>
+      <th class="l">Where it comes from</th><th class="l">Area</th><th>Extra revenue: low</th><th>Expected</th><th>High</th><th>Profit margin (%)</th><th>Yearly value</th><th></th>
+    </tr></thead><tbody></tbody></table></div>
+  </div>
+
+  <div class="panel mt">
+    <h3>Where the value comes from</h3>
+    <div class="chartbox xs"><canvas id="useChart"></canvas></div>
+    <p class="note">Watch for double counting: fewer breakdowns may already include some of the labor savings you listed.</p>
+  </div>
+  <details class="calc panel mt" open><summary>How this step is calculated</summary><div class="calcbody" id="calc-ben"></div></details>
+  <div class="nav-next"><button class="btn ghost" data-go="fit">Back</button><button class="btn" data-go="cost">Next: costs</button></div>
+</section>
+
+<!-- ============ 4. COSTS ============ -->
+<section class="view" id="v-cost" role="tabpanel">
+  <p class="stepno">Step 4 of 6</p>
+  <h2>What would a full digital twin cost?</h2>
+  <p class="lede">Include everything needed to build it and keep it running: the model itself, sensors and data, software, people, training and security. As in step 3, price the full version; cheaper options are scaled in step 5.</p>
+  <p><span class="unit" id="unitNote2"></span></p>
+  <div class="inline-field">
+    <div><label class="f" for="cont">Contingency on one-time costs (%)</label><input type="number" id="cont" min="0" max="200" step="1" style="max-width:160px"></div>
+    <div><p class="hint" style="margin:0 0 6px" id="contHint"></p><button class="btn ghost sm" id="contApply">Use suggested</button></div>
+  </div>
+  <div class="kpis" id="costKpis"></div>
+  <div class="panel">
+    <div class="split">
+      <h3 style="margin:0">Cost items</h3>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <span class="hint" style="margin:0">Project size:</span>
+        <div class="chips" id="scaleChips">
+          <button class="chip" data-scale="0.3">Small</button>
+          <button class="chip" data-scale="1">Medium</button>
+          <button class="chip" data-scale="4">Large</button>
+        </div>
+        <button class="btn ghost sm" id="addCost">Add a cost</button>
+      </div>
+    </div>
+    <p class="sub">When: <b>One-time</b> is paid at the start, <b>Yearly</b> every year after, <b>Every N years</b> for replacements such as sensors. Project size scales all current amounts up or down.</p>
+    <div class="tablewrap"><table id="tCost"><thead><tr>
+      <th class="l">Cost</th><th class="l">When</th><th>Every N years</th><th>Low</th><th>Expected</th><th>High</th><th></th>
+    </tr></thead><tbody></tbody></table></div>
+  </div>
+  <div class="grid g-2 mt">
+    <div class="panel">
+      <h3>Quick estimate</h3>
+      <p class="sub">Price something by quantity, such as software seats, sensors or floor area, then add it to the list.</p>
+      <div class="fields">
+        <div><label class="f" for="qeName">What</label><input type="text" id="qeName" value="Software licenses"></div>
+        <div><label class="f" for="qeQty">Quantity</label><input type="number" id="qeQty" min="0" value="10"></div>
+        <div><label class="f" for="qeUnit">Price each (full amount)</label><input type="number" id="qeUnit" min="0" value="700"></div>
+        <div><label class="f" for="qeWhen">When</label><select id="qeWhen"><option value="yr">Yearly</option><option value="up">One-time</option></select></div>
+      </div>
+      <p id="qeOut" style="margin:14px 0 10px;font-weight:600"></p>
+      <button class="btn ghost sm" id="qeAdd">Add to cost items</button>
+    </div>
+    <div class="panel">
+      <h3>Costs people often forget</h3>
+      <ul class="facts">
+        <li>Cleaning up and connecting data from different systems is often the biggest hidden cost.</li>
+        <li>Skilled people to build, run and trust the model, and training for the people who use it.</li>
+        <li>Cybersecurity: a twin connects equipment to networks and holds sensitive know-how.</li>
+        <li>Keeping the model up to date as equipment, products and processes change.</li>
+        <li>Replacing sensors and hardware during the study period.</li>
+      </ul>
+    </div>
+  </div>
+  <details class="calc panel mt" open><summary>How this step is calculated</summary><div class="calcbody" id="calc-cost"></div></details>
+  <div class="nav-next"><button class="btn ghost" data-go="ben">Back</button><button class="btn" data-go="opts">Next: compare options</button></div>
+</section>
+
+<!-- ============ 5. OPTIONS ============ -->
+<section class="view" id="v-opts" role="tabpanel">
+  <p class="stepno">Step 5 of 6</p>
+  <h2>Which option gives the best return?</h2>
+  <p class="lede">You don't have to build the most advanced twin. Each option below delivers part of the full twin's benefit for part of its cost. The percentages are suggested from your step 2 answers; change them if you have quotes or pilot results.</p>
+  <div class="panel">
+    <div class="split">
+      <h3 style="margin:0">Four ways to go</h3>
+      <button class="btn ghost sm" id="resetOpts">Use suggested percentages</button>
+    </div>
+    <details class="explain"><summary>What do these columns mean?</summary><div><b>Share of benefit</b> is how much of the step 3 value this option would deliver. <b>Share of cost</b> is how much of the step 4 cost it would take. <b>Net value today</b> is the total value minus the total cost over the whole period, converted to today's money: above zero means the option pays off. <b>Yearly return</b> is the annual return on the money spent. <b>Return per 1 spent</b> is value divided by cost.</div></details>
+    <div class="tablewrap"><table id="tOpts"><thead><tr>
+      <th class="l">See in verdict</th><th class="l">Option</th><th>Share of benefit (%)</th><th>Share of cost (%)</th><th>Total value</th><th>Total cost</th><th>Net value today</th><th>Yearly return</th><th>Return per 1 spent</th>
+    </tr></thead><tbody></tbody></table></div>
+    <p class="hint" style="margin-top:10px" id="optHint"></p>
+  </div>
+  <div class="panel mt">
+    <h3>Net value today, by option</h3>
+    <div class="chartbox sm"><canvas id="optChart"></canvas></div>
+  </div>
+  <details class="calc panel mt" open><summary>How this step is calculated</summary><div class="calcbody" id="calc-opts"></div></details>
+  <div class="nav-next"><button class="btn ghost" data-go="cost">Back</button><button class="btn" data-go="res">Next: verdict</button></div>
+</section>
+
+<!-- ============ 6. VERDICT ============ -->
+<section class="view" id="v-res" role="tabpanel">
+  <p class="stepno">Step 6 of 6</p>
+  <h2 id="resTitle">Verdict</h2>
+  <div class="banner" id="banner"></div>
+  <div class="kpis" id="resKpis"></div>
+  <h3>Safety margin</h3>
+  <p class="sub">How wrong your estimates could be before the investment stops paying off.</p>
+  <div class="kpis" id="beKpis"></div>
+  <div class="grid g-2">
+    <div class="panel">
+      <h3>Money in and out, year by year</h3>
+      <p class="sub">Bars are each year's savings minus costs. The line is the running total in today's money; where it crosses zero, the investment has paid for itself.</p>
+      <div class="chartbox sm"><canvas id="cfChart"></canvas></div>
+    </div>
+    <div class="panel">
+      <h3>Which guesses matter most</h3>
+      <p class="sub">How far the net value moves when each input goes from its low to its high guess. Firm up the top items first.</p>
+      <div class="chartbox sm"><canvas id="torChart"></canvas></div>
+    </div>
+  </div>
+  <div class="panel mt">
+    <div class="split">
+      <h3 style="margin:0">How sure can you be?</h3>
+      <div style="display:flex;gap:8px;align-items:center">
+        <select id="iters" style="width:auto" aria-label="Number of runs"><option value="1000">1,000 scenarios</option><option value="5000" selected>5,000 scenarios</option><option value="10000">10,000 scenarios</option></select>
+        <button class="btn" id="runMC">Test the uncertainty</button>
+      </div>
+    </div>
+    <p class="sub">This replays the numbers thousands of times, each time picking random values between your low and high guesses, mostly near the expected value. It shows how often the investment comes out ahead. The same scenarios are used on every run, so results only change when your inputs do.</p>
+    <div class="kpis" id="mcKpis" style="margin-bottom:12px"></div>
+    <div class="chartbox sm"><canvas id="mcChart"></canvas></div>
+  </div>
+  <div class="panel mt">
+    <h3>Year-by-year table</h3>
+    <div class="tablewrap"><table id="tFlows"></table></div>
+  </div>
+  <details class="calc panel mt" open><summary>How this step is calculated</summary><div class="calcbody" id="calc-res"></div></details>
+  <div class="nav-next"><button class="btn ghost" data-go="opts">Back</button><span></span></div>
+</section>
+
+<!-- ============ GUIDE ============ -->
+<section class="view" id="v-guide" role="tabpanel">
+  <h2>Guide and glossary</h2>
+  <div class="prose">
+    <h3>Acknowledgment and source</h3>
+    <p>This planner is built on the framework in a report by the U.S. National Institute of Standards and Technology (NIST). The report sets out the ideas used throughout the tool: that the right level of modeling depends on system complexity and on the cost of non-optimal settings or design; that a twin's benefit comes mainly from losses it helps avoid; that a "fit for purpose" model is often more cost-effective than the most detailed one; and that investments should be compared with net present value, internal rate of return and Monte Carlo uncertainty analysis. The formula for the net present value of a digital twin, the grouping of costs into development, data collection and analysis, model upkeep and other costs, and the use of low, likely and high estimates with triangular distributions also follow the report.</p>
+    <p><b>Citation:</b> Thomas, D. (2024). <i>Economics of Digital Twins: Costs, Benefits, and Economic Decision Making</i>. NIST Advanced Manufacturing Series 100-61. National Institute of Standards and Technology, Gaithersburg, MD. <a href="https://doi.org/10.6028/NIST.AMS.100-61" target="_blank" rel="noopener">doi.org/10.6028/NIST.AMS.100-61</a></p>
+    <p>The questionnaire, industry examples, option percentages, start-up timing, overlap, contingency, tax and safety-margin features are additions made for this tool; they are not from the report, and any errors are the tool author's. NIST did not develop, review or endorse this planner, and mention of the report does not imply endorsement by NIST.</p>
+
+    <h3>The idea in one paragraph</h3>
+    <p>Every system loses money when it runs below its best: breakdowns, wasted energy, scrap, idle time, late deliveries, design rework. A digital twin predicts how the system will behave so you can set it up and run it closer to its best. Its value is the losses it removes; its cost is building and running it. More detailed models remove more losses but cost disproportionately more, so there is usually a level of detail where the gain is largest. For simple systems, or where mistakes are cheap, that sweet spot is often a basic model or plain monitoring rather than a full twin.</p>
+
+    <h3>How the planner works</h3>
+    <p>Each step ends with a "How this step is calculated" section that shows the formulas with your own numbers. <b>Step 2</b> scores complexity and the cost of mistakes, and suggests how detailed the model should be. <b>Steps 3 and 4</b> collect the yearly value and the costs of a full twin. <b>Step 5</b> estimates four options, from simple monitoring to a full twin, as shares of that value and cost, and compares their net value. <b>Step 6</b> gives the verdict for the best option (or the one you pick), shows which guesses matter most, and tests how likely it is to pay off.</p>
+
+    <h3>Glossary</h3>
+    <dl>
+      <dt>Digital twin</dt><dd>A virtual model of a real object, process or system that is fed with data and used to predict its behavior and test decisions before making them.</dd>
+      <dt>Net value today (net present value, NPV)</dt><dd>All future savings minus all costs, with later years discounted so everything is in today's money. Above zero: the investment beats your discount rate.</dd>
+      <dt>Discount rate</dt><dd>The yearly return you could get on the money elsewhere, or your organization's hurdle rate. Higher rates make future savings count for less.</dd>
+      <dt>Yearly return (internal rate of return, IRR)</dt><dd>The annual return the investment earns. If it is higher than your discount rate, the investment pays off.</dd>
+      <dt>Return per 1 spent (benefit–cost ratio)</dt><dd>Total discounted value divided by total discounted cost. 1.5 means every 1 spent brings back 1.50.</dd>
+      <dt>Payback</dt><dd>How many years it takes, in today's money, for the savings to cover everything spent so far.</dd>
+      <dt>Contingency</dt><dd>An allowance added to one-time costs for things that go wrong or were missed. Less ready organizations need more.</dd>
+      <dt>Overlap</dt><dd>A reduction applied to total savings when some items partly describe the same saving.</dd>
+      <dt>Safety margin (break-even)</dt><dd>How far savings could fall, or costs rise, before net value drops to zero.</dd>
+      <dt>Low, expected and high</dt><dd>Your range of guesses. The expected value drives the main result; the range drives the uncertainty test.</dd>
+      <dt>Uncertainty test</dt><dd>A simulation (sometimes called Monte Carlo) that recalculates the result thousands of times with random values inside your ranges, to show the spread of possible outcomes.</dd>
+      <dt>Gradually / once a target is met / all or nothing</dt><dd>How value grows with accuracy. Gradually: every improvement helps, such as tuning energy use. Target: value arrives once a tolerance is reached, such as parts that must fit. All or nothing: a requirement is either met or not.</dd>
+    </dl>
+
+    <h3>Entering amounts</h3>
+    <p>Type money as full amounts, for example 8,000,000 for eight million. You can also type shortcuts: 250k becomes 250,000, 8m becomes 8,000,000 and 1.2b becomes 1,200,000,000. Commas are added for you when you leave the box. In results and charts, amounts under a million are shown in full, and larger ones are shortened: $8.00M is eight million and $1.20B is 1.2 billion.</p>
+    <h3>Tips for good estimates</h3>
+    <p>Start from real figures: last year's maintenance bill, energy bill, scrap rate, number of breakdowns and what each one cost including lost output. Be cautious with percentage cuts: a few percent on a large cost is often more realistic than a large cut on a small one. Price rare but severe events as expected yearly costs. Get at least one quote for the model and data work, and don't forget the people and data clean-up it takes. If the verdict hinges on one guess, test that guess with a small pilot before committing.</p>
+
+    <h3>What the planner does not do</h3>
+    <p>Tax is optional and simplified (a flat rate with straight-line write-off, assuming the organization has profits to offset). Financing costs are not modeled; use a discount rate that reflects your cost of capital. The example numbers are illustrations, not benchmarks for your organization. The option percentages in step 5 are rules of thumb. Treat the output as a structured estimate that shows what you need to be true for the investment to pay off.</p>
+  </div>
+</section>
+<footer class="sitefoot">
+  <p><b>Acknowledgment:</b> Method based on Thomas, D. (2024). <i>Economics of Digital Twins: Costs, Benefits, and Economic Decision Making</i>. NIST Advanced Manufacturing Series 100-61. National Institute of Standards and Technology, Gaithersburg, MD. <a href="https://doi.org/10.6028/NIST.AMS.100-61" target="_blank" rel="noopener">doi.org/10.6028/NIST.AMS.100-61</a></p>
+  <p>NIST did not develop, review or endorse this tool. Results are estimates, not financial advice.</p>
+</footer>
+</main>
+</div>
+
+<script>
+(function(){
+"use strict";
+const $ = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+let uid = 1; const nid = () => "i" + (uid++) + Math.random().toString(36).slice(2,6);
+
+const USE = {pdm:"Maintenance and reliability", opt:"Operations and efficiency", mon:"Quality and service", inv:"Inventory and supply", des:"Design and development", oth:"Other"};
+const USE_KEYS = Object.keys(USE);
+
+function baseCosts(){
+  return [
+    {name:"Building the model", when:"up", every:5, v:[150,250,450]},
+    {name:"Sensors, connectivity and hardware", when:"up", every:5, v:[80,150,300]},
+    {name:"Connecting and cleaning up data", when:"up", every:5, v:[50,100,200]},
+    {name:"Training and rollout", when:"up", every:5, v:[20,40,80]},
+    {name:"Software and cloud", when:"yr", every:5, v:[30,50,80]},
+    {name:"Staff to collect and analyze data", when:"yr", every:5, v:[60,100,160]},
+    {name:"Maintaining sensors and data systems", when:"yr", every:5, v:[10,20,40]},
+    {name:"Keeping the model up to date", when:"yr", every:5, v:[30,50,90]},
+    {name:"Cybersecurity", when:"yr", every:5, v:[10,20,40]},
+    {name:"Replacing sensors", when:"per", every:5, v:[40,60,100]}
+  ];
+}
+const E = (name,use,base,l,m,h) => ({type:"eff",name,use,base,v:[l,m,h]});
+const R = (name,use,freq,cpe,l,m,h) => ({type:"risk",name,use,freq,cpe,v:[l,m,h]});
+const V = (name,use,l,m,h,margin) => ({type:"rev",name,use,margin,v:[l,m,h]});
+const TEMPLATES = {
+  mfg:{name:"Factory or production line", desc:"Machines, assembly lines, process plants",
+    ans:{c:[3,3,3,3],k:[3,2,3,3]},
+    ben:[E("Production labor","opt",8000,2,5,8),E("Materials, scrap and rework","opt",20000,0.5,1.5,3),E("Energy","opt",1500,2,5,10),E("Maintenance","pdm",2000,5,10,20),
+         R("Unplanned machine stoppages","pdm",12,50,15,30,45),V("Orders won back from fewer delays and defects","mon",200,500,900,25)],
+    tips:["Unplanned stoppages and scrap are usually the biggest wins. Include the lost output, not just the repair bill.","Materials are often the largest cost, so even a 1–2% cut can matter more than a big cut elsewhere.","A focused twin of the bottleneck machine is often a better start than the whole plant."]},
+  energy:{scale:4, name:"Energy and utilities", desc:"Power plants, grids, wind and solar, water networks",
+    ans:{c:[4,3,3,3],k:[4,4,3,4]},
+    ben:[E("Operations and maintenance","pdm",5000,4,8,12),E("Fuel and energy bought","opt",10000,0.5,1.5,3),R("Forced outages","pdm",6,250,10,25,40),R("Regulatory fines","mon",1,150,20,40,60),V("Extra output sold from higher availability","opt",300,800,1500,30)],
+    tips:["Forced outages often dominate. Price each one including lost sales and penalties.","Predicting failures before they happen is the most common first use in this sector.","Weather and demand make these systems highly variable, which favors more detailed models."]},
+  bldg:{scale:0.3, name:"Buildings and facilities", desc:"Offices, campuses, malls, data centers",
+    ans:{c:[2,2,2,2],k:[2,2,2,3]},
+    ben:[E("Energy for heating, cooling and lighting","opt",800,5,10,20),E("Maintenance and repairs","pdm",600,5,12,20),R("Equipment failures (HVAC, lifts, pumps)","pdm",10,15,15,30,45),E("Space costs from better use of floor area","opt",3000,1,3,5)],
+    tips:["Energy and maintenance are the usual wins; savings per building are modest, so keep the twin lean.","Use the quick estimate in step 4 to price the twin by floor area if you have a per-area quote.","A portfolio of similar buildings can share one model, which spreads the cost."]},
+  health:{name:"Healthcare", desc:"Hospitals, clinics, medical equipment",
+    ans:{c:[3,3,3,3],k:[4,4,4,3]},
+    ben:[E("Facility energy and operations","opt",2000,3,8,12),R("Medical equipment downtime","pdm",20,20,15,30,45),E("Staff time lost to scheduling and patient flow","opt",6000,1,3,5),V("Extra capacity from better patient flow","opt",500,1500,3000,15),E("Supplies inventory","inv",1500,3,8,15)],
+    tips:["Equipment downtime and patient flow are common starting points.","For extra capacity, count only the margin, not the full revenue.","Patient safety and regulatory exposure raise the cost of mistakes, which favors more detailed models for critical equipment."]},
+  logi:{name:"Logistics and supply chain", desc:"Warehouses, distribution, delivery networks",
+    ans:{c:[4,4,4,3],k:[3,1,4,3]},
+    ben:[E("Cost of holding inventory","inv",4000,4,10,15),E("Transport and fleet","opt",10000,1,4,7),R("Stockouts and missed deliveries","mon",50,20,10,25,40),E("Warehouse labor","opt",5000,2,5,8)],
+    tips:["Holding inventory commonly costs around a fifth of its value per year once storage, capital and spoilage are counted.","Twins of supply networks need data from partners; check you can actually get it.","Missed deliveries are best entered as problems avoided, with the full cost of each one."]},
+  aero:{scale:4, name:"Aerospace and defense", desc:"Aircraft, engines, vehicle design and support",
+    ans:{c:[5,4,3,5],k:[5,5,5,5]},
+    ben:[E("Design and engineering time","des",10000,10,20,35),E("Physical prototypes and testing","des",3000,10,25,35),E("Maintenance","pdm",8000,4,10,15),R("Unscheduled groundings and failures","pdm",10,150,10,20,30)],
+    tips:["Early in a program the biggest lever is design time and fewer physical prototypes; later it is maintenance.","Very complex products can make a full twin extremely expensive, so compare focused options in step 5.","Safety and mission impact make mistakes costly, which usually justifies higher detail for critical parts."]},
+  oil:{scale:4, name:"Oil, gas and chemicals", desc:"Refineries, platforms, pipelines, process plants",
+    ans:{c:[4,3,3,4],k:[5,5,3,5]},
+    ben:[R("Unplanned shutdowns","pdm",4,1000,10,25,40),E("Maintenance","pdm",6000,4,10,15),E("Energy and chemicals","opt",3000,2,5,8),R("Safety and environmental incidents","mon",0.5,3000,10,25,40)],
+    tips:["Rare but severe events usually decide the case. Enter them as problems avoided with a fractional frequency.","A focused twin of the highest-risk unit is often the best first step.","Include clean-up, fines and reputational costs in the cost of an incident."]},
+  infra:{name:"Infrastructure", desc:"Bridges, tunnels, rail, roads, pipes",
+    ans:{c:[3,3,2,3],k:[4,4,3,4]},
+    ben:[E("Inspections","mon",1500,10,20,35),E("Repairs and rehabilitation","pdm",5000,3,8,12),R("Asset failures","pdm",0.5,5000,10,30,50),R("Service disruptions","mon",5,200,10,20,35)],
+    tips:["Failures are rare but very costly. Use expected yearly frequency, e.g. 0.1 for once in ten years.","Fewer or better-targeted inspections are often the quickest win.","Long asset lives justify a longer evaluation period, 15–20 years."]},
+  fleet:{name:"Vehicles and transport", desc:"Fleets, trains, buses, vehicle programs",
+    ans:{c:[3,3,3,3],k:[3,3,3,3]},
+    ben:[E("Fleet maintenance","pdm",3000,5,10,18),R("Breakdowns in service","pdm",40,10,15,30,45),E("Fuel and energy","opt",5000,1,3,6),V("Revenue from more vehicles available","mon",100,300,600,20)],
+    tips:["A breakdown in service costs more than the repair: include towing, replacement vehicles and lost revenue.","For simple vehicles, tracking a few signals such as engine temperature and vibration may be enough.","Fuel savings from better routing and driving are often a separate, cheaper project."]},
+  custom:{name:"Something else", desc:"Start from a mostly blank sheet",
+    ans:{c:[3,3,3,3],k:[3,3,3,3]},
+    ben:[E("A running cost","opt",1000,2,5,10),R("A recurring problem","pdm",2,50,10,30,50),V("Extra income","mon",0,100,200,20)],
+    tips:["Start with your two or three biggest costs or risks; a few items usually drive the result.","Use last year's actual figures as the cost today.","If you're unsure about a percentage, give a wide low-to-high range and let the uncertainty test show whether it matters."]}
+};
+const QC = [
+  ["Many parts, settings or factors affect how it performs","A stapler is 1; an aircraft assembly line is 5"],
+  ["Conditions vary a lot","Load, demand, weather, materials, users"],
+  ["The best way to run it changes often",""],
+  ["Results are hard to predict from experience","Even experts are often surprised"]
+];
+const QK = [
+  ["Downtime or running below its best is expensive",""],
+  ["Failures affect safety, the environment or compliance",""],
+  ["Mistakes quickly reach customers or service levels",""],
+  ["Large amounts of money depend on how it is set up and run","Assets, energy, materials, engineering"]
+];
+const QR = [
+  ["The data you need exists and is easy to get",""],
+  ["You have people with data and modeling skills",""],
+  ["Your cybersecurity is solid",""]
+];
+
+// ---------------- state ----------------
+const KEY = "dt-value-planner-v2";
+function freshState(tpl){
+  tpl = tpl || "mfg"; const t = TEMPLATES[tpl], sc = t.scale || 1;
+  return {
+    tpl, name:"", cur:"$", T:10, r:7, build:6, rampY:1, gB:0, gC:2, taxOn:false, tax:25, dep:5, overlap:0, cont:15,
+    ans:{c:t.ans.c.slice(), k:t.ans.k.slice(), r:[3,3,3]}, eff:"continuous",
+    ben: t.ben.map(b => Object.assign({id:nid()}, JSON.parse(JSON.stringify(b)))),
+    costs: baseCosts().map(c => Object.assign({id:nid()}, c, {v:c.v.map(x => +(x*sc).toFixed(1))})),
+    alts:null, sel:"auto", scale:String(sc)
+  };
+}
+let S;
+try { S = JSON.parse(localStorage.getItem(KEY)); } catch(e){ S = null; }
+if (!S || !S.ben || !TEMPLATES[S.tpl]) S = freshState();
+let saveT = null;
+function save(){ clearTimeout(saveT); saveT = setTimeout(()=>{ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }, 300); }
+
+// ---------------- helpers ----------------
+function money(k, d){
+  if (!isFinite(k)) return "n/a";
+  const a = Math.abs(k), s = k < 0 ? "−" : "", c = S.cur;
+  if (a >= 1e6) return s + c + (a/1e6).toFixed(d ?? 2) + "B";
+  if (a >= 1e3) return s + c + (a/1e3).toFixed(d ?? 2) + "M";
+  return s + c + Math.round(a*1000).toLocaleString("en-US");
+}
+// money inputs: shown and typed as full amounts, stored internally in thousands
+const fmtFull = k => (Math.round((+k||0)*1000)).toLocaleString("en-US");
+function parseFull(str){
+  let s = String(str).trim().toLowerCase().replace(/[,\s]/g,"").replace(/[^0-9.\-kmb]/g,"");
+  let mult = 1;
+  if (/[kmb]$/.test(s)){ mult = {k:1e3, m:1e6, b:1e9}[s.slice(-1)]; s = s.slice(0,-1); }
+  const v = parseFloat(s);
+  return isFinite(v) ? v*mult/1000 : 0;
+}
+const amt = (f, vK, label) => `<input type="text" inputmode="decimal" class="amt" data-f="${f}" data-money="1" value="${fmtFull(vK)}" aria-label="${label}">`;
+function wireAmt(el, set){
+  el.addEventListener("input", ()=>{ set(parseFull(el.value)); save(); refreshAll(); });
+  el.addEventListener("blur", ()=>{ el.value = fmtFull(parseFull(el.value)); });
+  el.addEventListener("focus", ()=>{ el.select(); });
+}
+const tickMoney = v => money(v, (Math.abs(v)>=1000 && Math.round(v)%1000!==0) ? 1 : 0);
+const pct = (x, d=1) => isFinite(x) ? (x*100).toFixed(d) + "%" : "n/a";
+let rnd = Math.random;
+function mulberry32(a){ return function(){ a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function tri(a, m, b){
+  const lo = Math.min(a,m,b), hi = Math.max(a,m,b); m = Math.min(Math.max(m,lo),hi);
+  if (hi <= lo) return m;
+  const u = rnd(), f = (m-lo)/(hi-lo);
+  return u < f ? lo + Math.sqrt(u*(hi-lo)*(m-lo)) : hi - Math.sqrt((1-u)*(hi-lo)*(hi-m));
+}
+const quant = (s, q) => { const i=(s.length-1)*q, lo=Math.floor(i), hi=Math.ceil(i); return s[lo]+(s[hi]-s[lo])*(i-lo); };
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function kpi(v, l, e, cls){ return `<div class="kpi"><div class="v ${cls||""}">${v}</div><div class="l">${l}</div>${e?`<div class="e">${e}</div>`:""}</div>`; }
+
+// ---------------- sizing model ----------------
+const avg = a => a.reduce((s,x)=>s+x,0)/a.length;
+const score = a => 1 + (avg(a)-1)/4*9;
+function curves(cx, cc, eff, soft){
+  const Bmax = 0.25*cc, m = 0.02 + 0.085*cx;
+  const s = soft ? (eff==="continuous" ? 7 : eff==="threshold" ? 20 : 60) : (eff==="continuous" ? 14 : eff==="threshold" ? 30 : 90);
+  const L = x => 1/(1+Math.exp(-s*(x-m)));
+  const B = x => Bmax*(L(x)-L(0))/(1-L(0));
+  const C = x => 0.15 + 0.1*x + 1.4*x*x*x;
+  return {B, C};
+}
+const OPTIONS = [
+  {name:"Simple monitoring", x:0.2, desc:"Sensors, dashboards and alerts on a few key signals"},
+  {name:"Basic model", x:0.4, desc:"Spreadsheet, statistical or rules-based predictions"},
+  {name:"Focused digital twin", x:0.62, desc:"A detailed virtual copy of one critical part or process"},
+  {name:"Full digital twin", x:0.9, desc:"A detailed, live virtual copy of the whole system"}
+];
+function suggestedAlts(){
+  const {B, C} = curves(score(S.ans.c), score(S.ans.k), S.eff, true);
+  const bF = B(0.9) || 1e-9, cF = C(0.9);
+  return OPTIONS.map(o => ({cap: Math.round(Math.min(100, B(o.x)/bF*100)), cf: Math.round(C(o.x)/cF*100), custom:false}));
+}
+function ensureAlts(){
+  const sug = suggestedAlts();
+  S.alts = !S.alts ? sug : S.alts.map((a,i) => a.custom ? a : sug[i]);
+}
+
+// ---------------- money math ----------------
+function benVal(b, j){
+  if (b.type === "eff") return (+b.base||0) * (+b.v[j]||0)/100;
+  if (b.type === "risk") return (+b.freq||0) * (+b.cpe||0) * (+b.v[j]||0)/100;
+  return (+b.v[j]||0) * (+b.margin||0)/100;
+}
+function benSample(b){
+  const t = tri(+b.v[0]||0, +b.v[1]||0, +b.v[2]||0);
+  if (b.type === "eff") return (+b.base||0) * t/100;
+  if (b.type === "risk") return (+b.freq||0) * (+b.cpe||0) * t/100;
+  return t * (+b.margin||0)/100;
+}
+function P(){
+  const n = (v, d) => isFinite(+v) && v !== "" ? +v : d;
+  return {T: Math.max(1, Math.min(30, Math.round(n(S.T,10)))), r: n(S.r,0)/100,
+    build: Math.max(0, n(S.build,0)), rampY: Math.max(0, n(S.rampY,0)),
+    gB: n(S.gB,0)/100, gC: n(S.gC,0)/100, overlap: Math.max(0, Math.min(100, n(S.overlap,0)))/100,
+    cont: Math.max(0, n(S.cont,0))/100, taxOn: !!S.taxOn, tax: n(S.tax,0)/100, dep: Math.max(1, Math.round(n(S.dep,5)))};
+}
+// month-by-month start-up profile: share of full savings reached, and share of year the twin is live
+function timing(p){
+  const g = p.build/12, out = [{lvl:0, live:0}];
+  for (let t=1;t<=p.T;t++){
+    let lvl = 0, live = 0;
+    for (let m=0;m<12;m++){
+      const tau = (t-1) + (m+0.5)/12;
+      if (tau >= g){ live += 1/12; lvl += (p.rampY > 0 ? Math.min(1, (tau-g)/p.rampY) : 1)/12; }
+    }
+    out.push({lvl, live});
+  }
+  return out;
+}
+// benAnnual: full-twin yearly savings before overlap; costVals: aligned with S.costs; cap/cf: option shares; bm/cm: multipliers for break-even
+function flows(benAnnual, costVals, cap, cf, p, bm, cm){
+  bm = bm ?? 1; cm = cm ?? 1;
+  const tm = timing(p), f = [];
+  for (let t=0;t<=p.T;t++) f.push({t, ben:0, up:0, run:0, cost:0, dep:0, tax:0, net:0, lvl: tm[t].lvl, live: tm[t].live});
+  for (let t=1;t<=p.T;t++) f[t].ben = benAnnual * (1-p.overlap) * cap * bm * tm[t].lvl * Math.pow(1+p.gB, t-1);
+  let capex = 0;
+  S.costs.forEach((c,i) => {
+    const v = (+costVals[i]||0) * cf * cm;
+    if (c.when === "up"){ const x = v*(1+p.cont); f[0].up += x; capex += x; }
+    else if (c.when === "yr"){ for (let t=1;t<=p.T;t++) f[t].run += v * tm[t].live * Math.pow(1+p.gC, t-1); }
+    else { const n = Math.max(1, Math.round(+c.every||5)); for (let t=n;t<=p.T;t+=n) f[t].run += v*Math.pow(1+p.gC, t-1); }
+  });
+  f.forEach(x => {
+    x.cost = x.up + x.run;
+    if (p.taxOn && x.t > 0){ x.dep = x.t <= p.dep ? capex/p.dep : 0; x.tax = p.tax * (x.ben - x.run - x.dep); }
+    x.net = x.ben - x.cost - x.tax;
+  });
+  return f;
+}
+const npvOf = (f, r) => f.reduce((s,x)=> s + x.net/Math.pow(1+r, x.t), 0);
+function irrOf(f){
+  let lo=-0.99, hi=10, flo=npvOf(f,lo), fhi=npvOf(f,hi);
+  if (!isFinite(flo) || flo*fhi > 0) return NaN;
+  for (let i=0;i<80;i++){ const m=(lo+hi)/2, fm=npvOf(f,m); if (fm*flo>0){lo=m;flo=fm;} else hi=m; }
+  return (lo+hi)/2;
+}
+function metrics(f, r){
+  let pvB=0, pvC=0, pvT=0, cum=0, dpb=null;
+  f.forEach(x => {
+    const d = Math.pow(1+r, x.t), n = x.net/d; pvB += x.ben/d; pvC += x.cost/d; pvT += x.tax/d;
+    const prev = cum; cum += n;
+    if (dpb===null && x.t>0 && prev<0 && cum>=0) dpb = x.t-1 + (-prev)/n;
+  });
+  return {npv:pvB-pvC-pvT, pvB, pvC, pvT, bcr: pvC>0 ? pvB/pvC : NaN, irr: irrOf(f), dpb};
+}
+const likelyBen = () => S.ben.reduce((s,b)=>s+benVal(b,1),0);
+const likelyCosts = () => S.costs.map(c => +c.v[1]||0);
+function evalOptions(){
+  ensureAlts();
+  const p = P(), B = likelyBen(), cv = likelyCosts();
+  return S.alts.map((a,i) => { const f = flows(B, cv, a.cap/100, a.cf/100, p); return Object.assign({i, f, a, o:OPTIONS[i]}, metrics(f, p.r)); });
+}
+const bestIndex = ev => ev.reduce((b,e,i)=> e.npv > ev[b].npv ? i : b, 0);
+const selectedIndex = ev => S.sel === "auto" ? bestIndex(ev) : +S.sel;
+
+// ---------------- charts ----------------
+const charts = {};
+Chart.defaults.font.family = '"Public Sans", system-ui, sans-serif';
+Chart.defaults.font.size = 12;
+Chart.defaults.maintainAspectRatio = false;
+Chart.defaults.animation = matchMedia("(prefers-reduced-motion: reduce)").matches ? false : {duration:250};
+function scales(xT, yT, extra){
+  const m = css("--muted"), r = css("--rule");
+  const ax = t => ({grid:{color:r, drawTicks:false}, ticks:{color:m}, border:{color:r}, title:{display:!!t, text:t, color:m}});
+  return {x:Object.assign(ax(xT), extra && extra.x), y:Object.assign(ax(yT), extra && extra.y)};
+}
+function setChart(key, canvas, cfg){
+  if (!charts[key]) charts[key] = new Chart($(canvas), cfg);
+  else { charts[key].data = cfg.data; charts[key].options = cfg.options; charts[key].update(); }
+}
+Chart.register({
+  id:"bands",
+  beforeDraw(chart, args, o){
+    if (!o || !o.on) return;
+    const {ctx, chartArea:a, scales:{x}} = chart, narrow = a.right-a.left < 500;
+    const bands = [[0,.3,css("--band1"),"Monitoring"],[.3,.5,css("--band1"),"Basic model"],[.5,.75,css("--band2"),"Focused twin"],[.75,1,css("--band3"),"Full twin"]];
+    ctx.save();
+    bands.forEach(([l,r,c,t],i)=>{
+      const x0=x.getPixelForValue(l), x1=x.getPixelForValue(r);
+      ctx.fillStyle=c; ctx.fillRect(x0,a.top,x1-x0,a.bottom-a.top);
+      if (i>0){ ctx.strokeStyle=css("--rule"); ctx.beginPath(); ctx.moveTo(x0,a.top); ctx.lineTo(x0,a.bottom); ctx.stroke(); }
+      ctx.fillStyle=css("--muted"); ctx.font=(narrow?'600 10px':'600 11.5px')+' "Public Sans", sans-serif'; ctx.textAlign="center";
+      ctx.fillText(t,(x0+x1)/2,a.top+15);
+    });
+    if (o.opt != null){
+      const px = x.getPixelForValue(o.opt), flip = o.opt > (narrow ? .5 : .78);
+      ctx.strokeStyle=css("--mark"); ctx.lineWidth=2; ctx.setLineDash([5,4]);
+      ctx.beginPath(); ctx.moveTo(px,a.top+22); ctx.lineTo(px,a.bottom); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle=css("--mark"); ctx.font='700 12px "Public Sans", sans-serif'; ctx.textAlign=flip?"right":"left";
+      ctx.fillText("Sweet spot", px+(flip?-6:6), a.top+34);
+    }
+    ctx.restore();
+  }
+});
+
+// ---------------- theme & nav ----------------
+try{ const t = localStorage.getItem("dt-value-theme"); if (t) document.documentElement.dataset.theme = t; }catch(e){}
+$("#themeBtn").addEventListener("click", ()=>{
+  const root = document.documentElement;
+  const dark = root.dataset.theme ? root.dataset.theme==="dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  root.dataset.theme = dark ? "light" : "dark";
+  try{ localStorage.setItem("dt-value-theme", root.dataset.theme); }catch(e){}
+  Chart.defaults.color = css("--muted"); refreshAll();
+});
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", ()=>{ Chart.defaults.color = css("--muted"); refreshAll(); });
+function go(view){
+  $$(".steps button").forEach(x => x.setAttribute("aria-selected", x.dataset.view===view ? "true":"false"));
+  $$("section.view").forEach(s => s.classList.toggle("on", s.id === "v-"+view));
+  const active = $(`.steps button[data-view="${view}"]`); if (active && active.scrollIntoView) active.scrollIntoView({block:"nearest", inline:"nearest"});
+  window.scrollTo({top:0});
+  refreshAll();
+}
+$$(".steps button").forEach(b => b.addEventListener("click", ()=>go(b.dataset.view)));
+$$("[data-go]").forEach(b => b.addEventListener("click", ()=>go(b.dataset.go)));
+
+// ======================================================
+// STEP 1
+// ======================================================
+let undoSnap = null;
+function buildTemplates(){
+  $("#tpls").innerHTML = Object.entries(TEMPLATES).map(([k,t]) =>
+    `<button class="tpl" data-tpl="${k}" aria-pressed="${S.tpl===k}"><b>${t.name}</b><span>${t.desc}</span></button>`).join("");
+  $$("[data-tpl]").forEach(b => b.addEventListener("click", ()=>{
+    if (b.dataset.tpl === S.tpl) return;
+    undoSnap = JSON.stringify(S);
+    const keep = {name:S.name, cur:S.cur, T:S.T, r:S.r, build:S.build, rampY:S.rampY, gB:S.gB, gC:S.gC, taxOn:S.taxOn, tax:S.tax, dep:S.dep};
+    S = Object.assign(freshState(b.dataset.tpl), keep);
+    $("#tplToastMsg").textContent = `Loaded the ${TEMPLATES[S.tpl].name.toLowerCase()} example. Your savings, costs and answers were replaced.`;
+    $("#tplToast").classList.add("on");
+    save(); fullRebuild();
+  }));
+}
+$("#undoTpl").addEventListener("click", ()=>{
+  if (!undoSnap) return; S = JSON.parse(undoSnap); undoSnap = null;
+  $("#tplToast").classList.remove("on"); save(); fullRebuild();
+});
+["name","cur","T","r","build","rampY","gB","gC","tax","dep","overlap","cont"].forEach(k => {
+  const el = $(k==="name" ? "#pname" : "#"+k);
+  el.addEventListener("input", ()=>{ S[k] = el.value; save(); if (k==="cur") rebuildTables(); refreshAll(); });
+});
+function syncSetupFields(){
+  $("#pname").value = S.name || ""; $("#cur").value = S.cur;
+  ["T","r","build","rampY","gB","gC","tax","dep","overlap","cont"].forEach(k => $("#"+k).value = S[k]);
+  $("#taxOn").checked = !!S.taxOn; $("#taxFields").style.display = S.taxOn ? "" : "none";
+}
+$("#taxOn").addEventListener("change", ()=>{ S.taxOn = $("#taxOn").checked; $("#taxFields").style.display = S.taxOn ? "" : "none"; save(); refreshAll(); });
+function suggestedCont(){ const rd = avg(S.ans.r); return rd < 2.5 ? 30 : rd < 3.5 ? 15 : 5; }
+$("#contApply").addEventListener("click", ()=>{ S.cont = suggestedCont(); $("#cont").value = S.cont; save(); refreshAll(); });
+function renderSetup(){
+  const t = TEMPLATES[S.tpl];
+  $("#tipsTitle").textContent = "Tips for " + t.name.toLowerCase();
+  $("#facts").innerHTML = t.tips.map(f => `<li>${esc(f)}</li>`).join("");
+}
+
+// ======================================================
+// STEP 2
+// ======================================================
+const EFF_HINT = {
+  continuous:"Every improvement in accuracy helps a bit more, like fine-tuning energy use.",
+  threshold:"Value arrives once a tolerance is reached, then levels off, like parts that must fit.",
+  binary:"A requirement is either met or not, like passing a safety check."
+};
+function buildQuestions(){
+  const mk = (list, key, box) => {
+    $(box).innerHTML = list.map((q,i) => `<div class="q"><div class="t">${q[0]}${q[1]?`<small>${q[1]}</small>`:""}</div>
+      <div class="seg" role="group" aria-label="${esc(q[0])}">${[1,2,3,4,5].map(v=>`<button data-q="${key}" data-i="${i}" data-v="${v}" aria-pressed="${S.ans[key][i]===v}">${v}</button>`).join("")}</div></div>`).join("");
+  };
+  mk(QC,"c","#qC"); mk(QK,"k","#qK"); mk(QR,"r","#qR");
+  $$("[data-q]").forEach(b => b.addEventListener("click", ()=>{
+    S.ans[b.dataset.q][+b.dataset.i] = +b.dataset.v;
+    $$(`[data-q="${b.dataset.q}"][data-i="${b.dataset.i}"]`).forEach(x => x.setAttribute("aria-pressed", x===b));
+    save(); refreshAll();
+  }));
+  $$("#effChips .chip").forEach(c => c.setAttribute("aria-pressed", c.dataset.eff===S.eff));
+}
+$$("#effChips .chip").forEach(b => b.addEventListener("click", ()=>{
+  S.eff = b.dataset.eff; $$("#effChips .chip").forEach(c => c.setAttribute("aria-pressed", c===b)); save(); refreshAll();
+}));
+function renderFit(){
+  const cx = score(S.ans.c), cc = score(S.ans.k);
+  $("#cxV").textContent = cx.toFixed(1) + " / 10"; $("#ccV").textContent = cc.toFixed(1) + " / 10";
+  $("#cxM").style.width = (cx*10)+"%"; $("#ccM").style.width = (cc*10)+"%";
+  $("#effHint").textContent = EFF_HINT[S.eff];
+  const {B, C} = curves(cx, cc, S.eff), pts = [];
+  let best = {x:0, n:-Infinity};
+  for (let i=2;i<=100;i++){ const x=i/100, n=B(x)-C(x); pts.push({x,b:B(x),c:C(x),n}); if (n>best.n) best={x,n}; }
+  const has = best.n > 0.05;
+  setChart("fit", "#fitChart", {type:"line", data:{datasets:[
+    {label:"Value created", data:pts.map(p=>({x:p.x,y:p.b})), borderColor:css("--benefit"), borderWidth:2.5, pointRadius:0},
+    {label:"Cost", data:pts.map(p=>({x:p.x,y:p.c})), borderColor:css("--cost"), borderWidth:2.5, pointRadius:0},
+    {label:"Net gain", data:pts.map(p=>({x:p.x,y:p.n})), borderColor:css("--net"), borderWidth:2.5, pointRadius:0}
+  ]}, options:{
+    interaction:{mode:"index", intersect:false},
+    plugins:{bands:{on:true, opt: has ? best.x : null}, legend:{position:"bottom", labels:{color:css("--ink"), boxWidth:14, boxHeight:3}}, tooltip:{enabled:false}},
+    scales: scales("Less detail  ←  model detail and accuracy  →  more detail", "", {
+      x:{type:"linear", min:0, max:1, ticks:{display:false}},
+      y:{min:-1.2, max:2.8, ticks:{display:false}, grid:{color:c => c.tick && c.tick.value===0 ? css("--muted") : css("--rule"), drawTicks:false}}
+    })}});
+  let head, body;
+  if (!has){ head="Probably not worth modeling"; body="At any level of detail, the model would cost more than it saves. Routine checks, or very cheap sensors, are likely the better choice."; }
+  else if (best.x >= .75){ head="A full digital twin looks justified"; body="The system is complex and mistakes are costly, so detailed predictions are worth paying for. Still, include only the parts and data that earn their keep."; }
+  else if (best.x >= .5){ head="A focused digital twin is likely the sweet spot"; body="Model the part or process where mistakes cost most, rather than the whole system."; }
+  else if (best.x >= .3){ head="A basic model is probably enough"; body="A spreadsheet, statistical or rules-based model should capture most of the value for a fraction of a twin's cost."; }
+  else { head="Start with simple monitoring"; body="Tracking a few key signals, such as temperature or vibration, with alerts should capture most of the value."; }
+  $("#verdict").innerHTML = `<div class="big">${head}</div><p>${body} Step 5 checks this with your own numbers.</p>`;
+  const rd = avg(S.ans.r);
+  $("#readyNote").innerHTML = "<b>Readiness:</b> " + (rd < 2.5
+    ? "low. Data clean-up, skills and security are the usual reasons twin projects run over budget. Step 4 suggests a 30% contingency on one-time costs; consider a small pilot first."
+    : rd < 3.5 ? "moderate. Step 4 suggests a 15% contingency on one-time costs. Make sure data clean-up, training and security are in your costs."
+    : "good. Step 4 suggests a 5% contingency on one-time costs.");
+}
+
+// ======================================================
+// STEP 3
+// ======================================================
+const useSel = b => `<select data-f="use" aria-label="Area">${USE_KEYS.map(k=>`<option value="${k}" ${b.use===k?"selected":""}>${USE[k]}</option>`).join("")}</select>`;
+const num = (f, v, step, label) => `<input type="number" step="${step||"any"}" data-f="${f}" value="${v}" aria-label="${label||f}">`;
+function rebuildBenefits(){
+  const rows = {eff:"", risk:"", rev:""};
+  S.ben.forEach(b => {
+    const common = `<td class="l"><input type="text" data-f="name" value="${esc(b.name)}" aria-label="Name"></td><td class="l">${useSel(b)}</td>`;
+    let mid;
+    if (b.type==="eff") mid = `<td>${amt("base",b.base,"Yearly cost today")}</td><td>${num("v0",b.v[0],"any","Low")}</td><td>${num("v1",b.v[1],"any","Expected")}</td><td>${num("v2",b.v[2],"any","High")}</td>`;
+    else if (b.type==="risk") mid = `<td>${num("freq",b.freq,"any","Times per year")}</td><td>${amt("cpe",b.cpe,"Cost each time")}</td><td>${num("v0",b.v[0],"any","Low")}</td><td>${num("v1",b.v[1],"any","Expected")}</td><td>${num("v2",b.v[2],"any","High")}</td>`;
+    else mid = `<td>${amt("v0",b.v[0],"Low")}</td><td>${amt("v1",b.v[1],"Expected")}</td><td>${amt("v2",b.v[2],"High")}</td><td>${num("margin",b.margin,"any","Margin")}</td>`;
+    rows[b.type] += `<tr data-id="${b.id}">${common}${mid}<td class="val" data-val></td><td><button class="del" data-del aria-label="Remove">×</button></td></tr>`;
+  });
+  const empty = n => `<tr><td class="l" colspan="${n}" style="color:var(--muted)">Nothing here yet.</td></tr>`;
+  $("#tEff tbody").innerHTML = rows.eff || empty(8);
+  $("#tRisk tbody").innerHTML = rows.risk || empty(9);
+  $("#tRev tbody").innerHTML = rows.rev || empty(8);
+  $$("#v-ben tr[data-id]").forEach(tr => {
+    const b = S.ben.find(x => x.id === tr.dataset.id);
+    tr.querySelectorAll("[data-money]").forEach(el => wireAmt(el, v => { const f = el.dataset.f; if (/^v\d$/.test(f)) b.v[+f[1]] = v; else b[f] = v; }));
+    tr.querySelectorAll("[data-f]:not([data-money])").forEach(el => el.addEventListener(el.tagName==="SELECT"?"change":"input", ()=>{
+      const f = el.dataset.f;
+      if (f==="name"||f==="use") b[f] = el.value;
+      else if (/^v\d$/.test(f)) b.v[+f[1]] = +el.value;
+      else b[f] = +el.value;
+      save(); refreshAll();
+    }));
+    tr.querySelector("[data-del]").addEventListener("click", ()=>{ S.ben = S.ben.filter(x=>x!==b); save(); rebuildBenefits(); refreshAll(); });
+  });
+}
+$$("[data-add]").forEach(b => b.addEventListener("click", ()=>{
+  const t = b.dataset.add;
+  const n = t==="eff" ? E("New cost","opt",0,0,0,0) : t==="risk" ? R("New problem","pdm",0,0,0,0,0) : V("New income","mon",0,0,0,20);
+  n.id = nid(); S.ben.push(n); save(); rebuildBenefits(); refreshAll();
+  const i = $(`tr[data-id="${n.id}"] input[type=text]`); if (i){ i.focus(); i.select(); }
+}));
+function unitText(){ return `Enter full amounts, e.g. 8,000,000 for eight million. Shortcuts work too: type 250k for 250,000 or 8m for 8,000,000. In results, M = million and B = billion.`; }
+function renderBenefits(){
+  $("#unitNote").textContent = unitText();
+  $$("#v-ben tr[data-id]").forEach(tr => { const b = S.ben.find(x=>x.id===tr.dataset.id); if (b) tr.querySelector("[data-val]").textContent = money(benVal(b,1),1); });
+  const ov = 1 - P().overlap;
+  const lo = S.ben.reduce((s,b)=>s+benVal(b,0),0)*ov, mid = likelyBen()*ov, hi = S.ben.reduce((s,b)=>s+benVal(b,2),0)*ov;
+  $("#benKpis").innerHTML = kpi(money(mid,2), "Expected value per year", "With a full digital twin, once fully running, after overlap.", "pos") +
+    kpi(money(lo,2)+" – "+money(hi,2), "Range", "Using all your low guesses, then all your high ones.") + kpi(S.ben.length, "Items listed", "");
+  const by = {}; S.ben.forEach(b => by[b.use] = (by[b.use]||0) + benVal(b,1));
+  const keys = USE_KEYS.filter(k => by[k]);
+  setChart("use", "#useChart", {type:"bar", data:{labels: keys.map(k=>USE[k]), datasets:[{data: keys.map(k=>+by[k].toFixed(1)), backgroundColor:css("--benefit"), borderRadius:3}]},
+    options:{indexAxis:"y", plugins:{bands:{on:false}, legend:{display:false}, tooltip:{callbacks:{label:c=>money(c.raw,1)+" per year"}}}, scales: scales("","",{x:{ticks:{callback:tickMoney}}, y:{grid:{display:false}}})}});
+}
+
+// ======================================================
+// STEP 4
+// ======================================================
+function rebuildCosts(){
+  $("#tCost tbody").innerHTML = S.costs.map(c => `<tr data-id="${c.id}">
+    <td class="l"><input type="text" data-f="name" value="${esc(c.name)}" aria-label="Cost"></td>
+    <td class="l"><select data-f="when" aria-label="When"><option value="up" ${c.when==="up"?"selected":""}>One-time</option><option value="yr" ${c.when==="yr"?"selected":""}>Yearly</option><option value="per" ${c.when==="per"?"selected":""}>Every N years</option></select></td>
+    <td>${c.when==="per" ? num("every", c.every, 1, "Every N years") : "<span style='color:var(--muted)'>—</span>"}</td>
+    <td>${amt("v0",c.v[0],"Low")}</td><td>${amt("v1",c.v[1],"Expected")}</td><td>${amt("v2",c.v[2],"High")}</td>
+    <td><button class="del" data-del aria-label="Remove">×</button></td></tr>`).join("") || `<tr><td class="l" colspan="7" style="color:var(--muted)">No costs yet. Add at least one.</td></tr>`;
+  $$("#tCost tr[data-id]").forEach(tr => {
+    const c = S.costs.find(x => x.id === tr.dataset.id);
+    tr.querySelectorAll("[data-money]").forEach(el => wireAmt(el, v => { c.v[+el.dataset.f[1]] = v; }));
+    tr.querySelectorAll("[data-f]:not([data-money])").forEach(el => el.addEventListener(el.tagName==="SELECT"?"change":"input", ()=>{
+      const f = el.dataset.f;
+      if (f==="name") c.name = el.value;
+      else if (f==="when"){ c.when = el.value; save(); rebuildCosts(); refreshAll(); return; }
+      else if (/^v\d$/.test(f)) c.v[+f[1]] = +el.value;
+      else c[f] = +el.value;
+      save(); refreshAll();
+    }));
+    tr.querySelector("[data-del]").addEventListener("click", ()=>{ S.costs = S.costs.filter(x=>x!==c); save(); rebuildCosts(); refreshAll(); });
+  });
+  $$("#scaleChips .chip").forEach(ch => ch.setAttribute("aria-pressed", ch.dataset.scale===S.scale));
+}
+$("#addCost").addEventListener("click", ()=>{
+  const c = {id:nid(), name:"New cost", when:"yr", every:5, v:[0,0,0]}; S.costs.push(c); save(); rebuildCosts(); refreshAll();
+  const i = $(`#tCost tr[data-id="${c.id}"] input[type=text]`); if (i){ i.focus(); i.select(); }
+});
+$$("#scaleChips .chip").forEach(ch => ch.addEventListener("click", ()=>{
+  const f = +ch.dataset.scale / (+S.scale || 1);
+  S.costs.forEach(c => c.v = c.v.map(x => +(x*f).toFixed(1)));
+  S.scale = ch.dataset.scale; save(); rebuildCosts(); refreshAll();
+}));
+function renderCosts(){
+  $("#unitNote2").textContent = unitText();
+  const p = P(), f = flows(0, likelyCosts(), 1, 1, p), pv = f.reduce((s,x)=>s+x.cost/Math.pow(1+p.r,x.t),0);
+  const up = S.costs.reduce((s,c)=>s+(c.when==="up"?+c.v[1]:0),0)*(1+p.cont), yr = S.costs.reduce((s,c)=>s+(c.when==="yr"?+c.v[1]:0),0);
+  $("#contHint").textContent = `Suggested from your readiness answers in step 2: ${suggestedCont()}%.`;
+  $("#costKpis").innerHTML = kpi(money(up,2),"One-time, expected",`Paid at the start, including ${Math.round(p.cont*100)}% contingency.`) + kpi(money(yr,2),"Yearly, expected","Running costs per full year, before growth.") +
+    kpi(money(pv,2),`Total over ${p.T} years`,"All costs in today's money.","neg");
+  const q = (+$("#qeQty").value||0) * (+$("#qeUnit").value||0) / 1000;
+  $("#qeOut").textContent = `= ${money(q,2)} ${$("#qeWhen").value==="yr" ? "per year" : "one-time"}`;
+}
+["#qeQty","#qeUnit","#qeWhen"].forEach(id => $(id).addEventListener("input", renderCosts));
+$("#qeAdd").addEventListener("click", ()=>{
+  const q = +(((+$("#qeQty").value||0) * (+$("#qeUnit").value||0)) / 1000).toFixed(1);
+  S.costs.push({id:nid(), name:$("#qeName").value || "Quick estimate", when:$("#qeWhen").value, every:5, v:[+(q*0.85).toFixed(1), q, +(q*1.25).toFixed(1)]});
+  save(); rebuildCosts(); refreshAll();
+});
+
+// ======================================================
+// STEP 5
+// ======================================================
+function rebuildOptions(){
+  ensureAlts();
+  $("#tOpts tbody").innerHTML = OPTIONS.map((o,i) => `<tr data-oi="${i}">
+    <td class="l"><input type="radio" name="optsel" value="${i}" aria-label="Show ${o.name} in verdict"></td>
+    <td class="l"><b>${o.name}</b><span data-bestbadge></span><br><span class="hint" style="margin:0">${o.desc}</span></td>
+    <td><input type="number" min="0" max="100" data-alt="cap" value="${S.alts[i].cap}" aria-label="Share of benefit"></td>
+    <td><input type="number" min="0" max="300" data-alt="cf" value="${S.alts[i].cf}" aria-label="Share of cost"></td>
+    <td data-o="pvB"></td><td data-o="pvC"></td><td data-o="npv" class="val"></td><td data-o="irr"></td><td data-o="bcr"></td></tr>`).join("");
+  $$("#tOpts [data-alt]").forEach(el => el.addEventListener("input", ()=>{
+    const i = +el.closest("tr").dataset.oi; S.alts[i][el.dataset.alt] = +el.value || 0; S.alts[i].custom = true; save(); refreshAll();
+  }));
+  $$("#tOpts input[type=radio]").forEach(r => r.addEventListener("change", ()=>{ S.sel = r.value; save(); refreshAll(); }));
+}
+$("#resetOpts").addEventListener("click", ()=>{ S.alts = null; S.sel = "auto"; ensureAlts(); save(); rebuildOptions(); refreshAll(); });
+function renderOptions(ev){
+  const bI = bestIndex(ev), sel = selectedIndex(ev);
+  ev.forEach((e,i) => {
+    const tr = $(`#tOpts tr[data-oi="${i}"]`); if (!tr) return;
+    tr.classList.toggle("best", i===bI);
+    tr.querySelector("[data-bestbadge]").innerHTML = i===bI ? '<span class="badge">Best return</span>' : "";
+    tr.querySelector('[data-o="pvB"]').textContent = money(e.pvB,2);
+    tr.querySelector('[data-o="pvC"]').textContent = money(e.pvC,2);
+    const n = tr.querySelector('[data-o="npv"]'); n.textContent = money(e.npv,2); n.className = "val " + (e.npv>=0?"pos":"neg");
+    tr.querySelector('[data-o="irr"]').textContent = pct(e.irr);
+    tr.querySelector('[data-o="bcr"]').textContent = isFinite(e.bcr) ? e.bcr.toFixed(2) : "n/a";
+    tr.querySelector("input[type=radio]").checked = i===sel;
+    ["cap","cf"].forEach(k => { const el = tr.querySelector(`[data-alt="${k}"]`); if (document.activeElement !== el) el.value = S.alts[i][k]; });
+  });
+  $("#optHint").textContent = S.sel === "auto" ? "The verdict shows the option with the best return. Pick another with the button on the left." : "You picked which option the verdict shows. Press “Use suggested percentages” to go back to automatic.";
+  setChart("opt", "#optChart", {type:"bar",
+    data:{labels: OPTIONS.map(o=>o.name), datasets:[{data: ev.map(e=>+e.npv.toFixed(1)), backgroundColor: ev.map((e,i)=> i===bI ? css("--mark") : (e.npv>=0 ? css("--benefit") : css("--cost"))), borderRadius:3}]},
+    options:{plugins:{bands:{on:false}, legend:{display:false}, tooltip:{callbacks:{label:c=>"Net value today "+money(c.raw,2)}}}, scales: scales("","",{y:{ticks:{callback:tickMoney}}, x:{grid:{display:false}}})}});
+}
+
+// ======================================================
+// STEP 6
+// ======================================================
+let lastMC = null, mcSig = "";
+function renderResults(ev){
+  const p = P(), si = selectedIndex(ev), e = ev[si], a = S.alts[si], bI = bestIndex(ev);
+  const what = S.name ? S.name : "your system";
+  $("#resTitle").textContent = OPTIONS[si].name + " for " + what;
+  // banner
+  let color, head, text;
+  const beats = isFinite(e.irr) ? ` It earns about ${pct(e.irr,0)} a year, against the ${S.r}% you could get elsewhere.` : "";
+  const pb = e.dpb !== null ? ` It pays for itself in about ${e.dpb.toFixed(1)} years.` : ` It does not pay for itself within ${p.T} years.`;
+  if (e.npv > 0 && (!isFinite(e.bcr) || e.bcr >= 1.3)){ color="--good"; head="Worth pursuing"; }
+  else if (e.npv > 0){ color="--warn"; head="Borderline: it pays off, but only just"; }
+  else { color="--bad"; head="Not worth it as it stands"; }
+  text = `Over ${p.T} years${p.taxOn?", after tax,":""} the ${OPTIONS[si].name.toLowerCase()} would ${e.npv>=0?"leave you":"cost you"} <b>${money(Math.abs(e.npv),2)}</b> ${e.npv>=0?"better off":"more than it saves"} in today's money.${beats}${pb}`;
+  if (si !== bI) text += ` The ${OPTIONS[bI].name.toLowerCase()} would do better: ${money(ev[bI].npv,2)}.`;
+  else if (e.npv <= 0) text += " Try a cheaper option, bigger savings, or a longer period in the earlier steps.";
+  if (lastMC && mcSig === sigNow(si)){ const pp = lastMC.npvs.filter(x=>x>0).length/lastMC.N; text += ` In the uncertainty test it came out ahead in ${pct(pp,0)} of scenarios.`; }
+  $("#banner").innerHTML = `<span class="dot" style="background:var(${color})"></span><div><div class="big" style="color:var(${color})">${head}</div><p>${text}</p></div>`;
+  $("#resKpis").innerHTML =
+    kpi(money(e.npv,2),"Net value today","Total savings minus total costs, in today's money. Above zero means it pays off.", e.npv>=0?"pos":"neg") +
+    kpi(pct(e.irr),"Yearly return",`Compare with your ${S.r}% discount rate.`) +
+    kpi(isFinite(e.bcr)?e.bcr.toFixed(2):"n/a","Return per 1 spent","Total value divided by total cost.") +
+    kpi(e.dpb===null?`> ${p.T} yrs`:e.dpb.toFixed(1)+" yrs","Payback","Years until savings cover the spending.") +
+    kpi(money(e.pvC,2),"Total cost","Everything spent, in today's money.");
+  // safety margin
+  const be = breakEven(si);
+  const benTxt = be.kBen <= 0 ? ["any amount","It pays off even with no savings.","pos"]
+    : be.kBen < 1 ? [pct(be.benDrop,0), `Down to ${pct(be.kBen,0)} of expected savings before net value hits zero.`, be.benDrop>=.3?"pos":"mid"]
+    : ["no margin", isFinite(be.kBen) ? `Savings would need to be ${pct(be.kBen-1,0)} higher to break even.` : "", "neg"];
+  const costTxt = !isFinite(be.mCost) || be.mCost < 0 ? ["any amount","",""+"pos"]
+    : be.mCost > 1 ? [pct(be.costRise,0), "Across all cost items before net value hits zero.", be.costRise>=.3?"pos":"mid"]
+    : ["no margin", `Costs would need to fall by ${pct(1-be.mCost,0)} to break even.`, "neg"];
+  $("#beKpis").innerHTML = kpi(benTxt[0],"Savings could fall by",benTxt[1],benTxt[2]) + kpi(costTxt[0],"Costs could rise by",costTxt[1],costTxt[2]) +
+    kpi(be.minT ? be.minT + (be.minT===1?" year":" years") : "over 30 years", "Shortest period that pays off", "Fewest years to evaluate with net value above zero.");
+  // cash flow
+  let cum = 0; const f = e.f;
+  const net = f.map(x=>+x.net.toFixed(1)), cumD = f.map(x=>{ cum += x.net/Math.pow(1+p.r,x.t); return +cum.toFixed(1); });
+  setChart("cf", "#cfChart", {type:"bar", data:{labels:f.map(x=>x.t===0?"Start":"Yr "+x.t), datasets:[
+    {type:"bar", label:p.taxOn ? "Savings minus costs and tax that year" : "Savings minus costs that year", data:net, backgroundColor: net.map(v=>v>=0?css("--benefit"):css("--cost")), borderRadius:2, order:2},
+    {type:"line", label:"Running total (today's money)", data:cumD, borderColor:css("--net"), backgroundColor:css("--net"), pointRadius:2.5, borderWidth:2, tension:.15, order:1}]},
+    options:{plugins:{bands:{on:false}, legend:{position:"bottom", labels:{color:css("--ink"), boxWidth:12}}, tooltip:{callbacks:{label:c=>c.dataset.label+": "+money(c.raw,1)}}}, scales: scales("","",{y:{ticks:{callback:tickMoney}}, x:{grid:{display:false}}})}});
+  // tornado
+  const Bl = likelyBen(), cv = likelyCosts(), rows = [];
+  S.ben.forEach(b => {
+    const lo = Bl - benVal(b,1) + benVal(b,0), hi = Bl - benVal(b,1) + benVal(b,2);
+    rows.push({n:b.name, a:npvOf(flows(lo,cv,a.cap/100,a.cf/100,p),p.r), b:npvOf(flows(hi,cv,a.cap/100,a.cf/100,p),p.r)});
+  });
+  S.costs.forEach((c,i) => {
+    const lo = cv.slice(), hi = cv.slice(); lo[i] = +c.v[0]; hi[i] = +c.v[2];
+    rows.push({n:c.name, a:npvOf(flows(Bl,lo,a.cap/100,a.cf/100,p),p.r), b:npvOf(flows(Bl,hi,a.cap/100,a.cf/100,p),p.r)});
+  });
+  rows.push({n:"Discount rate ±2 points", a:npvOf(f, Math.max(0,p.r-0.02)), b:npvOf(f, p.r+0.02)});
+  rows.forEach(r => r.s = Math.abs(r.b-r.a)); rows.sort((x,y)=>y.s-x.s);
+  const top = rows.slice(0,8), trunc = t => t.length > 32 ? t.slice(0,31)+"…" : t;
+  setChart("tor", "#torChart", {type:"bar", data:{labels: top.map(r=>trunc(r.n)), datasets:[{data: top.map(r=>[Math.min(r.a,r.b), Math.max(r.a,r.b)]), backgroundColor:css("--net"), borderRadius:2, barPercentage:.7}]},
+    options:{indexAxis:"y", plugins:{bands:{on:false}, legend:{display:false}, tooltip:{callbacks:{label:c=>`Net value ${money(c.raw[0],2)} to ${money(c.raw[1],2)}`}}}, scales: scales("Net value today","",{x:{ticks:{callback:tickMoney}}, y:{grid:{display:false}}})}});
+  // table
+  let html = `<thead><tr><th class="l">Year</th>${f.map(x=>`<th>${x.t===0?"Start":x.t}</th>`).join("")}</tr></thead><tbody>`;
+  html += `<tr><td class="l">Savings</td>${f.map(x=>`<td>${money(x.ben,1)}</td>`).join("")}</tr>`;
+  html += `<tr><td class="l">Costs</td>${f.map(x=>`<td>${money(-x.cost,1)}</td>`).join("")}</tr>`;
+  if (p.taxOn) html += `<tr><td class="l">Tax</td>${f.map(x=>`<td>${money(-x.tax,1)}</td>`).join("")}</tr>`;
+  html += `<tr><td class="l"><b>Net</b></td>${f.map(x=>`<td><b>${money(x.net,1)}</b></td>`).join("")}</tr>`;
+  html += `<tr><td class="l">Worth today per 1</td>${f.map(x=>`<td>${(1/Math.pow(1+p.r,x.t)).toFixed(3)}</td>`).join("")}</tr>`;
+  html += `<tr><td class="l">Net in today's money</td>${f.map(x=>`<td>${money(x.net/Math.pow(1+p.r,x.t),1)}</td>`).join("")}</tr></tbody>`;
+  $("#tFlows").innerHTML = html;
+  if (lastMC && mcSig !== sigNow(si)){ lastMC = null; if (charts.mc){ charts.mc.data.datasets[0].data = []; charts.mc.update(); } }
+  if (!lastMC) $("#mcKpis").innerHTML = kpi("—","Not run yet","Press “Test the uncertainty” to see the range of outcomes.");
+}
+function sigNow(si){ return JSON.stringify([S.ben, S.costs, S.alts[si], si, P()]); }
+function runMC(){
+  const ev = evalOptions(), si = selectedIndex(ev), a = S.alts[si], p = P(), N = +$("#iters").value;
+  const npvs = [], irrs = [];
+  rnd = mulberry32(20240611);
+  for (let k=0;k<N;k++){
+    const B = S.ben.reduce((s,b)=>s+benSample(b),0);
+    const cv = S.costs.map(c => tri(+c.v[0]||0, +c.v[1]||0, +c.v[2]||0));
+    const f = flows(B, cv, a.cap/100, a.cf/100, p);
+    npvs.push(npvOf(f,p.r)); const ir = irrOf(f); if (isFinite(ir)) irrs.push(ir);
+  }
+  rnd = Math.random;
+  npvs.sort((x,y)=>x-y); irrs.sort((x,y)=>x-y);
+  lastMC = {npvs, irrs, N}; mcSig = sigNow(si);
+  refreshAll();
+}
+function drawMC(){
+  if (!lastMC) return;
+  const {npvs, irrs, N} = lastMC, pPos = npvs.filter(x=>x>0).length/N;
+  $("#mcKpis").innerHTML =
+    kpi(pct(pPos,0),"Chance it pays off","Share of scenarios with net value above zero.", pPos>=.8?"pos":pPos>=.5?"mid":"neg") +
+    kpi(money(quant(npvs,.5),2),"Typical result","Half the scenarios did better, half worse.") +
+    kpi(money(quant(npvs,.05),2)+" to "+money(quant(npvs,.95),2),"Likely range","9 in 10 scenarios fell in this range.") +
+    kpi(irrs.length?pct(quant(irrs,.5)):"n/a","Typical yearly return","");
+  const lo = npvs[0], hi = npvs[npvs.length-1], bins = 40, w = (hi-lo)/bins || 1, counts = new Array(bins).fill(0);
+  npvs.forEach(x => counts[Math.min(bins-1, Math.floor((x-lo)/w))]++);
+  const mids = counts.map((_,i)=>lo+w*(i+.5));
+  setChart("mc", "#mcChart", {type:"bar", data:{labels: mids.map(x=>money(x,1)), datasets:[{data:counts, backgroundColor: mids.map(x=>x>=0?css("--benefit"):css("--cost")), barPercentage:1, categoryPercentage:1}]},
+    options:{plugins:{bands:{on:false}, legend:{display:false}, tooltip:{callbacks:{title:c=>"Net value ≈ "+c[0].label, label:c=>c.raw+" scenarios ("+pct(c.raw/N,1)+")"}}},
+      scales: scales("Net value today (green = pays off, purple = loses money)","Number of scenarios",{x:{grid:{display:false}, ticks:{maxTicksLimit:8}}})}});
+}
+$("#runMC").addEventListener("click", runMC);
+
+// ======================================================
+// break-even
+// ======================================================
+function breakEven(si){
+  const p = P(), a = S.alts[si], B = likelyBen(), cv = likelyCosts(), c = a.cap/100, k = a.cf/100;
+  const nB0 = npvOf(flows(B,cv,c,k,p,0,1),p.r), nB1 = npvOf(flows(B,cv,c,k,p,1,1),p.r);
+  const nC0 = npvOf(flows(B,cv,c,k,p,1,0),p.r);
+  const kBen = nB1 !== nB0 ? -nB0/(nB1-nB0) : Infinity;          // savings multiplier where NPV = 0
+  const mCost = nC0 !== nB1 ? nC0/(nC0-nB1) : Infinity;           // cost multiplier where NPV = 0
+  let minT = null;
+  for (let T=1;T<=30;T++){ const q = Object.assign({}, p, {T}); if (npvOf(flows(B,cv,c,k,q),p.r) > 0){ minT = T; break; } }
+  return {kBen, mCost, benDrop: 1-kBen, costRise: mCost-1, minT, nB0, nB1, nC0};
+}
+
+// ======================================================
+// "How this step is calculated" panels
+// ======================================================
+const fx = s => `<div class="fx">${s}</div>`;
+const ex = (s, t) => `<div class="ex">${t?`<span class="t">${t}</span>`:""}${s}</div>`;
+const n1 = v => (+v).toLocaleString(undefined,{maximumFractionDigits:2});
+function yearShares(p){ return timing(p).slice(1); }
+
+function calcSetup(){
+  const p = P(), tm = yearShares(p), rr = 1+p.r;
+  const shown = tm.slice(0, Math.min(4, p.T));
+  let h = `<h4>1. Turning future money into today's money</h4>
+  <p>A saving of 100 next year is worth less than 100 today, because today's money could be earning a return. Every future amount is divided by a discount factor that grows each year.</p>
+  ${fx(`Value today = Amount in year t ÷ (1 + discount rate)<sup>t</sup>`)}
+  ${ex(`100 received in year 5 at ${S.r}% is worth 100 ÷ ${rr.toFixed(3)}<sup>5</sup> = <b>${(100/Math.pow(rr,5)).toFixed(2)}</b> today.`, "With your discount rate")}
+  <h4>2. When savings start</h4>
+  <p>The planner works month by month. Before go-live there are no savings and no running costs. After go-live, savings climb in a straight line until they reach 100% after the ramp-up period. A year's share is the average of its 12 months.</p>
+  ${fx(`Share of full savings in a month = 0 before go-live; otherwise min(1, months since go-live ÷ ramp-up months)`)}
+  <table><thead><tr><th class="l">Year</th>${shown.map((_,i)=>`<th>${i+1}</th>`).join("")}</tr></thead><tbody>
+  <tr><td class="l">Share of the year the twin is live</td>${shown.map(x=>`<td>${pct(x.live,0)}</td>`).join("")}</tr>
+  <tr><td class="l">Share of full savings achieved</td>${shown.map(x=>`<td>${pct(x.lvl,0)}</td>`).join("")}</tr></tbody></table>
+  ${ex(`With ${n1(p.build)} months to build and ${n1(p.rampY)} year(s) of ramp-up, year 1 gets <b>${pct(tm[0].lvl,0)}</b> of the full yearly savings.`, "With your timing")}
+  <h4>3. Growth</h4>
+  <p>Savings and running costs change each year by the growth rates you set.</p>
+  ${fx(`Amount in year t = Amount in year 1 × (1 + growth rate)<sup>t − 1</sup>`)}
+  ${ex(`Running costs of 100 in year 1 become 100 × ${(1+p.gC).toFixed(3)}<sup>${Math.max(p.T-1,0)}</sup> = <b>${(100*Math.pow(1+p.gC,p.T-1)).toFixed(1)}</b> by year ${p.T}.`, "With your cost growth")}
+  <h4>4. Tax</h4>`;
+  h += p.taxOn
+    ? `<p>Tax is charged on each year's savings minus running costs minus the write-off of one-time costs. One-time costs (with contingency) are written off in equal parts over ${p.dep} years. A negative tax is a saving on your other profits.</p>
+       ${fx(`Tax in year t = tax rate × (savings − running costs − one-time costs ÷ write-off years)`)}
+       ${ex(`At ${S.tax}%, a year with 500 of savings, 100 of running costs and 60 of write-off pays ${S.tax}% × (500 − 100 − 60) = <b>${(p.tax*340).toFixed(1)}</b> in tax.`, "Example")}`
+    : `<p>Tax is switched off, so all results are before tax. Switch it on above to include it.</p>`;
+  $("#calc-setup").innerHTML = h;
+}
+
+function calcFit(){
+  const c = S.ans.c, k = S.ans.k, cx = score(c), cc = score(k);
+  const {B, C} = curves(cx, cc, S.eff, true), sug = suggestedAlts();
+  let h = `<h4>1. Scores</h4>
+  <p>Each group of four answers is averaged, then stretched from the 1–5 answer scale onto a 1–10 score.</p>
+  ${fx(`Score = 1 + (average answer − 1) ÷ 4 × 9`)}
+  ${ex(`Complexity: answers ${c.join(", ")} → average ${avg(c).toFixed(2)} → 1 + (${avg(c).toFixed(2)} − 1) ÷ 4 × 9 = <b>${cx.toFixed(1)}</b><br>Cost of mistakes: answers ${k.join(", ")} → average ${avg(k).toFixed(2)} → <b>${cc.toFixed(1)}</b>`, "With your answers")}
+  <h4>2. The chart</h4>
+  <p>The horizontal axis is model detail, from 0 (no model) to 1 (the most detailed twin possible). Value follows an S-shape: little at first, rising quickly once the model is detailed enough to capture how the system really behaves, then levelling off. The more complex the system, the further right the rise happens. The costlier mistakes are, the higher the curve goes. Cost starts with a fixed amount and climbs ever faster, because each extra step in accuracy is harder to achieve.</p>
+  ${fx(`Value(d) = 0.25 × mistakes score × S(d),  with the S-curve centred at d = 0.02 + 0.085 × complexity score`)}
+  ${fx(`Cost(d) = 0.15 + 0.1 d + 1.4 d<sup>3</sup>`)}
+  ${ex(`The S-curve is centred at d = 0.02 + 0.085 × ${cx.toFixed(1)} = <b>${(0.02+0.085*cx).toFixed(2)}</b>. The sweet spot is the level of detail where value minus cost is largest.`, "With your scores")}
+  <p>These curves are in relative units. They show which level of detail is likely to be best, not how much money is involved.</p>
+  <h4>3. Suggested percentages for step 5</h4>
+  <p>Each option sits at a level of detail. Its share of the full twin's benefit is the value curve at that level divided by the value at the full twin. Its share of cost is found the same way on the cost curve. A gentler S-curve is used here than in the chart, so simpler options are credited with some partial value.</p>
+  ${fx(`Share of benefit = Value(option) ÷ Value(full twin)      Share of cost = Cost(option) ÷ Cost(full twin)`)}
+  <table><thead><tr><th class="l">Option</th><th>Detail level</th><th>Share of benefit</th><th>Share of cost</th></tr></thead><tbody>
+  ${OPTIONS.map((o,i)=>`<tr><td class="l">${o.name}</td><td>${o.x}</td><td>${sug[i].cap}%</td><td>${sug[i].cf}%</td></tr>`).join("")}</tbody></table>
+  <h4>4. Readiness</h4>
+  <p>Readiness does not change the curves. It sets the suggested contingency on one-time costs in step 4: average below 2.5 → 30%, below 3.5 → 15%, otherwise 5%.</p>
+  ${ex(`Your readiness answers average ${avg(S.ans.r).toFixed(2)} → suggested contingency <b>${suggestedCont()}%</b>.`, "With your answers")}`;
+  $("#calc-fit").innerHTML = h;
+}
+
+function calcBen(){
+  const p = P(), first = t => S.ben.find(b => b.type === t);
+  const e = first("eff"), r = first("risk"), v = first("rev");
+  const raw = likelyBen(), lo = S.ben.reduce((s,b)=>s+benVal(b,0),0), hi = S.ben.reduce((s,b)=>s+benVal(b,2),0);
+  let h = `<p>Everything on this page is the yearly value of a <b>full</b> digital twin once it is fully running. Start-up timing and growth (step 1) and the option percentages (step 5) are applied later.</p>
+  <h4>1. Lower running costs</h4>
+  ${fx(`Yearly value = yearly cost today × % cut`)}
+  ${e ? ex(`${esc(e.name)}: ${money(+e.base,1)} × ${n1(e.v[1])}% = <b>${money(benVal(e,1),1)}</b> per year`, "Your first item") : ""}
+  <h4>2. Problems avoided</h4>
+  <p>A problem that may or may not happen is valued by its expected yearly cost: how often it happens times what it costs, times the share the twin would prevent.</p>
+  ${fx(`Yearly value = times per year × cost each time × % prevented`)}
+  ${r ? ex(`${esc(r.name)}: ${n1(r.freq)} × ${money(+r.cpe,1)} × ${n1(r.v[1])}% = <b>${money(benVal(r,1),1)}</b> per year`, "Your first item") : ""}
+  <h4>3. Extra income</h4>
+  <p>Extra sales also bring extra costs to produce them, so only the profit margin counts.</p>
+  ${fx(`Yearly value = extra revenue × profit margin`)}
+  ${v ? ex(`${esc(v.name)}: ${money(+v.v[1],1)} × ${n1(v.margin)}% = <b>${money(benVal(v,1),1)}</b> per year`, "Your first item") : ""}
+  <h4>4. Total and overlap</h4>
+  ${fx(`Total yearly value = (sum of all expected values) × (1 − overlap %)`)}
+  ${ex(`${money(raw,2)} × (1 − ${n1(S.overlap)}%) = <b>${money(raw*(1-p.overlap),2)}</b> per year`, "With your numbers")}
+  <h4>5. The range</h4>
+  <p>The range repeats the sum using every low guess, then every high guess. It is wider than what you should really expect, because in practice not everything goes badly, or well, at once. The uncertainty test in step 6 handles that properly.</p>
+  ${ex(`All low: ${money(lo*(1-p.overlap),2)}; all high: ${money(hi*(1-p.overlap),2)} per year (after overlap).`, "With your numbers")}`;
+  $("#calc-ben").innerHTML = h;
+}
+
+function calcCost(){
+  const p = P(), cv = likelyCosts(), f = flows(0, cv, 1, 1, p);
+  const upRaw = S.costs.reduce((s,c)=>s+(c.when==="up"?+c.v[1]:0),0);
+  const yrRaw = S.costs.reduce((s,c)=>s+(c.when==="yr"?+c.v[1]:0),0);
+  const per = S.costs.find(c=>c.when==="per");
+  const pv = f.reduce((s,x)=>s+x.cost/Math.pow(1+p.r,x.t),0);
+  let h = `<p>As with benefits, these are the costs of a <b>full</b> digital twin. Cheaper options scale them in step 5.</p>
+  <h4>1. One-time costs</h4>
+  <p>Paid at the start (year 0), with the contingency added for overruns and forgotten items.</p>
+  ${fx(`One-time cost = sum of expected one-time costs × (1 + contingency %)`)}
+  ${ex(`${money(upRaw,2)} × (1 + ${n1(S.cont)}%) = <b>${money(upRaw*(1+p.cont),2)}</b>`, "With your numbers")}
+  <h4>2. Yearly costs</h4>
+  <p>Running costs start when the twin goes live, so a year in which the twin runs for only part of the time carries only that share. They then grow each year by the cost growth rate.</p>
+  ${fx(`Running cost in year t = yearly cost × share of year live × (1 + cost growth)<sup>t − 1</sup>`)}
+  ${ex(`Year 1: ${money(yrRaw,1)} × ${pct(f[1]?f[1].live:0,0)} live = <b>${money(yrRaw*(f[1]?f[1].live:0),1)}</b>` + (p.T>=2 ? `<br>Year 2: ${money(yrRaw,1)} × ${pct(f[2].live,0)} × ${(1+p.gC).toFixed(3)} = <b>${money(yrRaw*f[2].live*(1+p.gC),1)}</b>` : ""), "With your numbers")}
+  <h4>3. Every N years</h4>
+  <p>Replacements are charged in full in years N, 2N, 3N and so on within the study period, grown by the cost growth rate.</p>
+  ${per ? ex(`${esc(per.name)}: ${money(+per.v[1],1)} in years ${Array.from({length:Math.floor(p.T/Math.max(1,Math.round(+per.every||5)))},(_,i)=>(i+1)*Math.max(1,Math.round(+per.every||5))).join(", ") || "none within the period"}.`, "Your first replacement item") : ""}
+  <h4>4. Total cost in today's money</h4>
+  ${fx(`Total cost = Σ cost in year t ÷ (1 + discount rate)<sup>t</sup>`)}
+  ${ex(f.slice(0,Math.min(3,f.length)).map(x=>`${money(x.cost,1)} ÷ ${Math.pow(1+p.r,x.t).toFixed(3)}`).join(" + ") + (p.T>2?" + …":"") + ` = <b>${money(pv,2)}</b>`, "With your numbers")}
+  <h4>5. Low and high</h4>
+  <p>The expected column drives the main result. Low and high are used for the "Which guesses matter most" chart and the uncertainty test in step 6.</p>`;
+  $("#calc-cost").innerHTML = h;
+}
+
+function calcOpts(ev){
+  const p = P(), bI = bestIndex(ev), e = ev[bI], a = S.alts[bI];
+  const full = flows(likelyBen(), likelyCosts(), 1, 1, p), mf = metrics(full, p.r);
+  let h = `<h4>1. Scaling the full twin</h4>
+  <p>Each option is treated as a scaled version of the full twin you described in steps 3 and 4: every year's savings are multiplied by its share of benefit, and every cost by its share of cost.</p>
+  ${fx(`Option savings in year t = full-twin savings in year t × share of benefit`)}
+  ${fx(`Option costs in year t = full-twin costs in year t × share of cost`)}
+  ${ex(`Full twin in today's money: savings ${money(mf.pvB,2)}, costs ${money(mf.pvC,2)}.<br>${OPTIONS[bI].name}: savings ${money(mf.pvB,2)} × ${a.cap}% = <b>${money(e.pvB,2)}</b>; costs ${money(mf.pvC,2)} × ${a.cf}% = <b>${money(e.pvC,2)}</b>.`, "With your numbers, for the best option")}
+  <h4>2. Net value today</h4>
+  <p>Add up each year's savings minus costs${p.taxOn?" minus tax":""}, after converting every year into today's money.</p>
+  ${fx(`Net value today = Σ (savings − costs${p.taxOn?" − tax":""}) in year t ÷ (1 + discount rate)<sup>t</sup>`)}
+  ${ex(`${money(e.pvB,2)} − ${money(e.pvC,2)}${p.taxOn?` − ${money(e.pvT,2)} tax`:""} = <b>${money(e.npv,2)}</b>`, "Best option")}
+  <h4>3. Yearly return</h4>
+  <p>The yearly return is the discount rate at which the net value today would be exactly zero. The planner finds it by trial and error, halving the search range 80 times. If it is above your ${S.r}% discount rate, the option pays off.</p>
+  ${ex(`${OPTIONS[bI].name}: ${pct(e.irr)} against ${S.r}%.`, "Best option")}
+  <h4>4. Return per 1 spent</h4>
+  ${fx(`Return per 1 spent = savings in today's money ÷ costs in today's money`)}
+  ${ex(`${money(e.pvB,2)} ÷ ${money(e.pvC,2)} = <b>${isFinite(e.bcr)?e.bcr.toFixed(2):"n/a"}</b>${p.taxOn?" (before tax)":""}`, "Best option")}
+  <h4>5. Picking the best</h4>
+  <p>The option with the highest net value today is marked best, because it leaves you with the most money. A cheaper option can have a higher yearly return but a lower net value; if money is tight, you may prefer it.</p>`;
+  $("#calc-opts").innerHTML = h;
+}
+
+function calcRes(ev){
+  const p = P(), si = selectedIndex(ev), e = ev[si], f = e.f, be = breakEven(si);
+  const terms = f.slice(0, Math.min(3, f.length)).map(x => `${money(x.net,1)} ÷ ${Math.pow(1+p.r,x.t).toFixed(3)}`).join(" + ");
+  let cum = 0, cross = null;
+  f.forEach(x => { const prev = cum; cum += x.net/Math.pow(1+p.r,x.t); if (cross===null && x.t>0 && prev<0 && cum>=0) cross = {t:x.t, prev, add: x.net/Math.pow(1+p.r,x.t)}; });
+  let h = `<h4>1. Net value today</h4>
+  <p>Each year's net cash flow (the "Net" row in the table above) is converted to today's money and added up.</p>
+  ${fx(`Net value today = Σ<sub>t = 0…${p.T}</sub> net in year t ÷ (1 + ${S.r}%)<sup>t</sup>`)}
+  ${ex(`${terms}${p.T>2?" + …":""} = <b>${money(e.npv,2)}</b>`, "With your numbers")}
+  <h4>2. Payback</h4>
+  <p>The running total in today's money starts negative (the one-time costs) and grows as savings come in. Payback is when it crosses zero, estimated within that year by assuming the year's amount arrives evenly.</p>
+  ${fx(`Payback = years before the crossing year + (shortfall at start of that year ÷ that year's amount)`)}
+  ${cross ? ex(`The total is ${money(cross.prev,1)} at the start of year ${cross.t} and that year adds ${money(cross.add,1)}: ${cross.t-1} + ${money(-cross.prev,1)} ÷ ${money(cross.add,1)} = <b>${(cross.t-1 + (-cross.prev)/cross.add).toFixed(1)} years</b>`, "With your numbers") : ex(`The running total never crosses zero within ${p.T} years.`, "With your numbers")}
+  <h4>3. Safety margin</h4>
+  <p>Net value moves in a straight line as all savings, or all costs, are scaled up or down. So the planner computes net value with no savings and with full savings, then finds where the line crosses zero. The same is done for costs.</p>
+  ${fx(`Savings needed = NPV with no savings ÷ (NPV with no savings − NPV as planned)`)}
+  ${ex(`Net value is ${money(be.nB0,2)} with no savings and ${money(be.nB1,2)} as planned, so break-even needs ${money(-be.nB0,2)} ÷ ${money(be.nB1-be.nB0,2)} = <b>${pct(be.kBen,0)}</b> of expected savings${be.kBen<1?`; they could fall by ${pct(be.benDrop,0)}`:`; savings would need to be ${pct(be.kBen-1,0)} higher`}.`, "With your numbers")}
+  ${fx(`Cost multiplier at break-even = NPV with no costs ÷ (NPV with no costs − NPV as planned)`)}
+  ${ex(`${money(be.nC0,2)} ÷ (${money(be.nC0,2)} − ${money(be.nB1,2)}) = <b>${isFinite(be.mCost)?be.mCost.toFixed(2):"n/a"}×</b> today's costs${be.costRise>0?`, so costs could rise by ${pct(be.costRise,0)}`:""}.`, "With your numbers")}
+  <h4>4. Which guesses matter most</h4>
+  <p>Each input is moved to its low guess, then its high guess, with everything else kept at expected. The bar shows the net value at each end. Inputs with long bars deserve more research.</p>
+  <h4>5. The uncertainty test</h4>
+  <p>For each scenario, every uncertain input is drawn at random from a triangular distribution: never below your low guess or above your high guess, and most likely near your expected value. Net value is recalculated for each scenario.</p>
+  ${fx(`Chance it pays off = scenarios with net value above zero ÷ all scenarios`)}
+  <p>The likely range runs from the 5th to the 95th percentile, so 9 in 10 scenarios fall inside it. The typical result is the median. Inputs are drawn independently of each other. The random draws use a fixed starting point, so the same inputs always give the same answer.</p>`;
+  if (lastMC) h += ex(`${lastMC.N.toLocaleString()} scenarios: ${lastMC.npvs.filter(x=>x>0).length.toLocaleString()} above zero = <b>${pct(lastMC.npvs.filter(x=>x>0).length/lastMC.N,0)}</b>.`, "Your last run");
+  $("#calc-res").innerHTML = h;
+}
+
+// ======================================================
+// refresh
+// ======================================================
+function renderLive(ev){
+  const si = selectedIndex(ev), e = ev[si];
+  $("#liveBox").innerHTML = `<div class="l">Current estimate</div><div class="v ${e.npv>=0?"pos":"neg"}">${money(e.npv,2)}</div><div class="l">net value today with the ${OPTIONS[si].name.toLowerCase()}</div>`;
+}
+function refreshAll(){
+  const on = ($("section.view.on")||{}).id, ev = evalOptions();
+  renderLive(ev);
+  if (on==="v-setup"){ renderSetup(); calcSetup(); }
+  if (on==="v-fit"){ renderFit(); calcFit(); }
+  if (on==="v-ben"){ renderBenefits(); calcBen(); }
+  if (on==="v-cost"){ renderCosts(); calcCost(); }
+  if (on==="v-opts"){ renderOptions(ev); calcOpts(ev); }
+  if (on==="v-res"){ renderResults(ev); drawMC(); calcRes(ev); }
+}
+function rebuildTables(){ rebuildBenefits(); rebuildCosts(); rebuildOptions(); }
+function fullRebuild(){ buildTemplates(); syncSetupFields(); buildQuestions(); rebuildTables(); lastMC = null; refreshAll(); }
+$("#resetAll").addEventListener("click", ()=>{
+  undoSnap = JSON.stringify(S); S = freshState(); save();
+  $("#tplToastMsg").textContent = "Started over with the factory example."; $("#tplToast").classList.add("on");
+  fullRebuild(); go("setup");
+});
+Chart.defaults.color = css("--muted");
+fullRebuild();
+})();
+</script>
+</body>
+</html>
