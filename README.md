@@ -4,7 +4,7 @@ A free, browser-based tool that helps you decide whether a digital twin is worth
 building for a machine, building, process or network, and how detailed it
 should be.
 
-**Live site:** https://YOUR-USERNAME.github.io/digital-twin-value-planner/
+**Live site:** https://mraz2026.github.io/digital-twin-value-planner-/
 
 ## What it does
 
